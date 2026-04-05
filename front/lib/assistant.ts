@@ -23,6 +23,11 @@ import {
   GPT_5_MINI_MODEL_CONFIG,
 } from "@app/types/assistant/models/openai";
 import {
+  OPENROUTER_ANTHROPIC_CLAUDE_HAIKU_4_5_MODEL_CONFIG,
+  OPENROUTER_ANTHROPIC_CLAUDE_SONNET_4_MODEL_CONFIG,
+  OPENROUTER_OPENAI_GPT_4O_MINI_MODEL_CONFIG,
+} from "@app/types/assistant/models/openrouter";
+import {
   BYOK_MODEL_PROVIDER_IDS,
   isByokProviderId,
   MODEL_PROVIDER_IDS,
@@ -103,7 +108,14 @@ export function getFastestWhitelistedModel(
   if (whitelistedProviders.has("google_ai_studio")) {
     return GEMINI_2_5_FLASH_MODEL_CONFIG;
   }
-  return _getSmallWhitelistedModel(whitelistedProviders);
+  const small = _getSmallWhitelistedModel(whitelistedProviders);
+  if (small) {
+    return small;
+  }
+  if (whitelistedProviders.has("openrouter")) {
+    return OPENROUTER_ANTHROPIC_CLAUDE_HAIKU_4_5_MODEL_CONFIG;
+  }
+  return null;
 }
 
 export function getSmallWhitelistedModel(
@@ -138,6 +150,9 @@ function _getSmallWhitelistedModel(
   if (whitelistedProviders.has("xai")) {
     return GROK_4_1_FAST_NON_REASONING_MODEL_CONFIG;
   }
+  if (whitelistedProviders.has("openrouter")) {
+    return OPENROUTER_OPENAI_GPT_4O_MINI_MODEL_CONFIG;
+  }
   return null;
 }
 
@@ -158,6 +173,9 @@ function _getLargeWhitelistedModel(
   }
   if (whitelistedProviders.has("xai")) {
     return GROK_4_MODEL_CONFIG;
+  }
+  if (whitelistedProviders.has("openrouter")) {
+    return OPENROUTER_ANTHROPIC_CLAUDE_SONNET_4_MODEL_CONFIG;
   }
   return null;
 }

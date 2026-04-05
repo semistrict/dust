@@ -317,6 +317,26 @@ async function handler(
           }
           return;
 
+        case "openrouter":
+          // eslint-disable-next-line no-restricted-globals
+          const testOpenRouter = await fetch(
+            `https://openrouter.ai/api/v1/models`,
+            {
+              method: "GET",
+              headers: {
+                Authorization: `Bearer ${config.api_key}`,
+              },
+            }
+          );
+          if (!testOpenRouter.ok) {
+            const err = await testOpenRouter.json();
+            res.status(400).json({ ok: false, error: err.error });
+          } else {
+            await testOpenRouter.json();
+            res.status(200).json({ ok: true });
+          }
+          return;
+
         default:
           return apiError(req, res, {
             status_code: 404,

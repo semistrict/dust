@@ -23,6 +23,7 @@ const ModelProviderIdSchema = FlexibleEnumSchema<
   | "deepseek"
   | "fireworks"
   | "xai"
+  | "openrouter"
   | "noop"
 >();
 
@@ -90,6 +91,13 @@ type KnownModelLLMId =
   | "grok-4-fast-reasoning-latest"
   | "grok-4-1-fast-non-reasoning-latest"
   | "grok-4-1-fast-reasoning-latest"
+  | "anthropic/claude-sonnet-4" // openrouter
+  | "anthropic/claude-haiku-4-5" // openrouter
+  | "openai/gpt-4o" // openrouter
+  | "openai/gpt-4o-mini" // openrouter
+  | "google/gemini-2.5-flash" // openrouter
+  | "meta-llama/llama-4-maverick" // openrouter
+  | "deepseek/deepseek-chat-v3-0324" // openrouter
   | "noop"; // Noop
 
 // Cast to allow custom/unknown model IDs while preserving autocomplete.

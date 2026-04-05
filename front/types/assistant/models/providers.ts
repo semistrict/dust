@@ -18,6 +18,7 @@ export const MODEL_PROVIDER_IDS = [
   "deepseek",
   "fireworks",
   "xai",
+  "openrouter",
   "noop",
 ] as const;
 
@@ -47,6 +48,8 @@ export function getProviderDisplayName(
       return "Fireworks";
     case "xai":
       return "xAI";
+    case "openrouter":
+      return "OpenRouter";
     case "noop":
       return "noop";
     default:

@@ -294,6 +294,23 @@ async function handler(
             models: [{ id: "deepseek-chat" }, { id: "deepseek-reasoner" }],
           });
 
+        case "openrouter":
+          if (embed) {
+            res.status(200).json({ models: [] });
+            return;
+          }
+          return res.status(200).json({
+            models: [
+              { id: "anthropic/claude-sonnet-4" },
+              { id: "anthropic/claude-haiku-4-5" },
+              { id: "openai/gpt-4o" },
+              { id: "openai/gpt-4o-mini" },
+              { id: "google/gemini-2.5-flash" },
+              { id: "meta-llama/llama-4-maverick" },
+              { id: "deepseek/deepseek-chat-v3-0324" },
+            ],
+          });
+
         default:
           return apiError(req, res, {
             status_code: 404,

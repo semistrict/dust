@@ -70,6 +70,9 @@ export const credentialsFromProviders = (
       case "xai":
         credentials["XAI_API_KEY"] = config.api_key;
         break;
+      case "openrouter":
+        credentials["OPENROUTER_API_KEY"] = config.api_key;
+        break;
       case "firecrawl":
         credentials["FIRECRAWL_API_KEY"] = config.api_key;
         break;

@@ -101,7 +101,9 @@ export function middleware(request: NextRequest) {
   // Redirect SPA paths to the main SPA app.
   if (isSpaPath(url)) {
     const appUrl = process.env.NEXT_PUBLIC_DUST_APP_URL;
-    if (appUrl) {
+    // Skip redirect when the SPA URL points to the same origin (no separate SPA running).
+    const isSameOrigin = !appUrl || appUrl === request.nextUrl.origin;
+    if (appUrl && !isSameOrigin) {
       const queryString = request.nextUrl.search; // includes leading '?' or empty
       return NextResponse.redirect(`${appUrl}${url}${queryString}`, 302);
     }

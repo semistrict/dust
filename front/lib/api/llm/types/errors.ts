@@ -241,6 +241,7 @@ const USERFACING_CLIENT_ID: Record<ModelProviderIdType, string> = {
   deepseek: "Deepseek",
   fireworks: "Fireworks",
   xai: "xAI",
+  openrouter: "OpenRouter",
   google_ai_studio: "Google AI Studio",
   noop: "Noop",
 };

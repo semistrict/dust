@@ -22,6 +22,7 @@ export type LLMCredentialsType = {
   COHERE_API_KEY?: string;
   AI21_API_KEY?: string;
   FIREWORKS_API_KEY?: string;
+  OPENROUTER_API_KEY?: string;
 };
 
 export type ProviderCredentialType = {

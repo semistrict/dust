@@ -10,10 +10,11 @@ let authorizeHostname: string | null = null;
 export function getWorkOS() {
   // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
   if (!workos) {
-    const apiHostname =
-      process.env.WORKOS_API_HOSTNAME || "auth-api.dust.tt";
+    const apiHostname = process.env.WORKOS_API_HOSTNAME || "auth-api.dust.tt";
     authorizeHostname = process.env.WORKOS_AUTHORIZE_HOSTNAME || null;
-    const useHttps = !apiHostname.startsWith("fake-workos");
+    const useHttps =
+      !apiHostname.startsWith("fake-workos") &&
+      !apiHostname.startsWith("localhost");
     workos = new WorkOS(config.getWorkOSApiKey(), {
       clientId: config.getWorkOSClientId(),
       apiHostname,
@@ -31,10 +32,10 @@ export function getWorkOS() {
 export function rewriteAuthorizeUrl(url: string): string {
   if (authorizeHostname) {
     const apiHostname = process.env.WORKOS_API_HOSTNAME || "";
-    return url.replace(
-      `http://${apiHostname}`,
-      `http://${authorizeHostname}`
-    );
+    // Replace both http:// and https:// variants (the SDK may use either)
+    return url
+      .replace(`https://${apiHostname}`, `http://${authorizeHostname}`)
+      .replace(`http://${apiHostname}`, `http://${authorizeHostname}`);
   }
   return url;
 }

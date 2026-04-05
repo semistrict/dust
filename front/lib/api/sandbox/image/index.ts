@@ -22,6 +22,7 @@ function providerToProfile(providerId: ModelProviderIdType): ToolProfile {
     case "togetherai":
     case "xai":
     case "fireworks":
+    case "openrouter":
     case "noop":
       return "anthropic";
     default:

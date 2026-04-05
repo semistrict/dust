@@ -52,6 +52,9 @@ const MODEL_PROVIDER_LOGOS: ModelProviderLogos = {
   xai: {
     light: GrokLogo,
   },
+  openrouter: {
+    light: DustLogo,
+  },
   noop: {
     light: DustLogo,
   },

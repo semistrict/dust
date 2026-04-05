@@ -10,6 +10,8 @@ import { NoopLLM } from "@app/lib/api/llm/clients/noop";
 import { isNoopWhitelistedModelId } from "@app/lib/api/llm/clients/noop/types";
 import { OpenAIResponsesLLM } from "@app/lib/api/llm/clients/openai";
 import { isOpenAIResponsesWhitelistedModelId } from "@app/lib/api/llm/clients/openai/types";
+import { OpenRouterLLM } from "@app/lib/api/llm/clients/openrouter";
+import { isOpenRouterWhitelistedModelId } from "@app/lib/api/llm/clients/openrouter/types";
 import { XaiLLM } from "@app/lib/api/llm/clients/xai";
 import { isXaiWhitelistedModelId } from "@app/lib/api/llm/clients/xai/types";
 import type { LLM } from "@app/lib/api/llm/llm";
@@ -120,6 +122,18 @@ export async function getLLM(
 
   if (isXaiWhitelistedModelId(modelId)) {
     return new XaiLLM(auth, {
+      credentials,
+      getTraceInput,
+      getTraceOutput,
+      modelId,
+      temperature,
+      reasoningEffort,
+      bypassFeatureFlag,
+    });
+  }
+
+  if (isOpenRouterWhitelistedModelId(modelId)) {
+    return new OpenRouterLLM(auth, {
       credentials,
       getTraceInput,
       getTraceOutput,
