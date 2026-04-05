@@ -123,6 +123,7 @@ case "${1:-help}" in
       DUST_FRONT_API="http://localhost:3000" \
       DUST_FRONT_INTERNAL_API="http://localhost:3000" \
       NEXT_PUBLIC_DUST_CLIENT_FACING_URL="http://localhost:3000" \
+      NEXT_PUBLIC_DUST_APP_URL="http://localhost:3011" \
       DUST_CLIENT_FACING_URL="http://localhost:3000" \
       DUST_AUTH_REDIRECT_BASE_URL="http://localhost:3000" \
       WORKOS_API_HOSTNAME="${WORKOS_HOST}:7600" \

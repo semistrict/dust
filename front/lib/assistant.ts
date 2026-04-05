@@ -23,9 +23,8 @@ import {
   GPT_5_MINI_MODEL_CONFIG,
 } from "@app/types/assistant/models/openai";
 import {
-  OPENROUTER_ANTHROPIC_CLAUDE_HAIKU_4_5_MODEL_CONFIG,
-  OPENROUTER_ANTHROPIC_CLAUDE_SONNET_4_MODEL_CONFIG,
-  OPENROUTER_OPENAI_GPT_4O_MINI_MODEL_CONFIG,
+  OPENROUTER_ANTHROPIC_CLAUDE_SONNET_4_6_MODEL_CONFIG,
+  OPENROUTER_OPENAI_GPT_5_4_MINI_MODEL_CONFIG,
 } from "@app/types/assistant/models/openrouter";
 import {
   BYOK_MODEL_PROVIDER_IDS,
@@ -113,7 +112,7 @@ export function getFastestWhitelistedModel(
     return small;
   }
   if (whitelistedProviders.has("openrouter")) {
-    return OPENROUTER_ANTHROPIC_CLAUDE_HAIKU_4_5_MODEL_CONFIG;
+    return OPENROUTER_OPENAI_GPT_5_4_MINI_MODEL_CONFIG;
   }
   return null;
 }
@@ -151,7 +150,7 @@ function _getSmallWhitelistedModel(
     return GROK_4_1_FAST_NON_REASONING_MODEL_CONFIG;
   }
   if (whitelistedProviders.has("openrouter")) {
-    return OPENROUTER_OPENAI_GPT_4O_MINI_MODEL_CONFIG;
+    return OPENROUTER_OPENAI_GPT_5_4_MINI_MODEL_CONFIG;
   }
   return null;
 }
@@ -175,7 +174,7 @@ function _getLargeWhitelistedModel(
     return GROK_4_MODEL_CONFIG;
   }
   if (whitelistedProviders.has("openrouter")) {
-    return OPENROUTER_ANTHROPIC_CLAUDE_SONNET_4_MODEL_CONFIG;
+    return OPENROUTER_ANTHROPIC_CLAUDE_SONNET_4_6_MODEL_CONFIG;
   }
   return null;
 }

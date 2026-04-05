@@ -23,7 +23,7 @@ import type { ModelConversationTypeMultiActions } from "@app/types/assistant/gen
 import { CLAUDE_4_5_HAIKU_DEFAULT_MODEL_CONFIG } from "@app/types/assistant/models/anthropic";
 import { GEMINI_2_5_FLASH_MODEL_CONFIG } from "@app/types/assistant/models/google_ai_studio";
 import { GPT_5_1_MODEL_CONFIG } from "@app/types/assistant/models/openai";
-import { OPENROUTER_OPENAI_GPT_4O_MINI_MODEL_CONFIG } from "@app/types/assistant/models/openrouter";
+import { OPENROUTER_OPENAI_GPT_5_4_MINI_MODEL_CONFIG } from "@app/types/assistant/models/openrouter";
 import type { ModelConfigurationType } from "@app/types/assistant/models/types";
 import type { Result } from "@app/types/shared/result";
 import { Err, Ok } from "@app/types/shared/result";
@@ -260,7 +260,7 @@ function getFastModelConfig(
     return GEMINI_2_5_FLASH_MODEL_CONFIG;
   }
   if (providers.has("openrouter")) {
-    return OPENROUTER_OPENAI_GPT_4O_MINI_MODEL_CONFIG;
+    return OPENROUTER_OPENAI_GPT_5_4_MINI_MODEL_CONFIG;
   }
 
   return getSmallWhitelistedModel(auth);

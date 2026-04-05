@@ -326,35 +326,42 @@ const CURRENT_MODEL_PRICING: Record<StaticModelIdType, PricingEntry> = {
     input: 0.2,
     output: 0.5,
   },
-  // OpenRouter models — pricing is the underlying provider price + OpenRouter markup.
-  // https://openrouter.ai/models
-  "anthropic/claude-sonnet-4": {
+  // OpenRouter models — https://openrouter.ai/models
+  "openai/gpt-5.4": {
+    input: 2.5,
+    output: 15.0,
+  },
+  "openai/gpt-5.4-mini": {
+    input: 0.75,
+    output: 4.5,
+  },
+  "openai/gpt-5.4-nano": {
+    input: 0.2,
+    output: 1.25,
+  },
+  "anthropic/claude-sonnet-4.6": {
     input: 3.0,
     output: 15.0,
   },
-  "anthropic/claude-haiku-4-5": {
-    input: 1.0,
-    output: 5.0,
+  "anthropic/claude-opus-4.6": {
+    input: 5.0,
+    output: 25.0,
   },
-  "openai/gpt-4o": {
-    input: 2.5,
-    output: 10.0,
+  "google/gemini-3.1-pro-preview": {
+    input: 2.0,
+    output: 12.0,
   },
-  "openai/gpt-4o-mini": {
-    input: 0.15,
-    output: 0.6,
-  },
-  "google/gemini-2.5-flash": {
-    input: 0.15,
-    output: 0.6,
-  },
-  "meta-llama/llama-4-maverick": {
+  "google/gemini-3-flash-preview": {
     input: 0.5,
-    output: 0.7,
+    output: 3.0,
   },
-  "deepseek/deepseek-chat-v3-0324": {
-    input: 0.14,
-    output: 0.28,
+  "deepseek/deepseek-v3.2": {
+    input: 0.26,
+    output: 0.38,
+  },
+  "xiaomi/mimo-v2-pro": {
+    input: 1.0,
+    output: 3.0,
   },
   noop: {
     input: 0,

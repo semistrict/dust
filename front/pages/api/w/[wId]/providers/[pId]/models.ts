@@ -301,13 +301,15 @@ async function handler(
           }
           return res.status(200).json({
             models: [
-              { id: "anthropic/claude-sonnet-4" },
-              { id: "anthropic/claude-haiku-4-5" },
-              { id: "openai/gpt-4o" },
-              { id: "openai/gpt-4o-mini" },
-              { id: "google/gemini-2.5-flash" },
-              { id: "meta-llama/llama-4-maverick" },
-              { id: "deepseek/deepseek-chat-v3-0324" },
+              { id: "openai/gpt-5.4" },
+              { id: "openai/gpt-5.4-mini" },
+              { id: "openai/gpt-5.4-nano" },
+              { id: "anthropic/claude-sonnet-4.6" },
+              { id: "anthropic/claude-opus-4.6" },
+              { id: "google/gemini-3.1-pro-preview" },
+              { id: "google/gemini-3-flash-preview" },
+              { id: "deepseek/deepseek-v3.2" },
+              { id: "xiaomi/mimo-v2-pro" },
             ],
           });
 
