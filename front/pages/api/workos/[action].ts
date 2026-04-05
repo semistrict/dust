@@ -121,7 +121,7 @@ import {
   SUPPORTED_REGIONS,
 } from "@app/lib/api/regions/config";
 import { checkUserRegionAffinity } from "@app/lib/api/regions/lookup";
-import { getWorkOS } from "@app/lib/api/workos/client";
+import { getWorkOS, rewriteAuthorizeUrl } from "@app/lib/api/workos/client";
 import { isOrganizationSelectionRequiredError } from "@app/lib/api/workos/types";
 import type { SessionCookie } from "@app/lib/api/workos/user";
 import { Authenticator, getSession } from "@app/lib/auth";
@@ -252,7 +252,7 @@ async function handleLogin(req: NextApiRequest, res: NextApiResponse) {
         : {}),
     });
 
-    res.redirect(authorizationUrl);
+    res.redirect(rewriteAuthorizeUrl(authorizationUrl));
   } catch (error) {
     logger.error({ error }, "Error during WorkOS login");
     getStatsDClient().increment("login.error", 1);

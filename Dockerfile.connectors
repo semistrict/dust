@@ -1,0 +1,66 @@
+FROM node:22.22.0-bookworm-slim AS base
+WORKDIR /app
+
+# Install dependencies
+FROM base AS deps
+RUN corepack enable npm
+COPY package.json package-lock.json ./
+COPY connectors/package.json connectors/
+COPY front/package.json front/
+COPY sparkle/package.json sparkle/
+COPY sdks/js/package.json sdks/js/
+COPY viz/package.json viz/
+COPY cli/dust-cli/package.json cli/dust-cli/
+COPY extension/package.json extension/
+COPY front-spa/package.json front-spa/
+RUN npm ci
+
+# Build
+FROM base AS builder
+COPY --from=deps /app/ ./
+COPY connectors/ connectors/
+COPY sdks/js/ sdks/js/
+
+WORKDIR /app/sdks/js
+RUN npm run build 2>/dev/null || true
+
+WORKDIR /app/connectors
+RUN npm run build
+# Temporal bundle build requires env vars at build time for module resolution
+RUN CONNECTORS_DATABASE_URI=postgres://x@x/x \
+    DUST_CONNECTORS_WEBHOOKS_SECRET=x \
+    DUST_FRONT_API=http://x \
+    DUST_FRONT_INTERNAL_API=http://x \
+    DUST_CLIENT_FACING_URL=http://x \
+    CONNECTORS_PUBLIC_URL=http://x \
+    OAUTH_API=http://x \
+    TEXT_EXTRACTION_URL=http://x \
+    TEMPORAL_NAMESPACE=default \
+    npm run build:temporal-bundles
+
+# Runner
+FROM base AS runner
+ENV NODE_ENV=production
+
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/connectors ./connectors
+COPY --from=builder /app/sdks/js ./sdks/js
+COPY --from=builder /app/package.json ./
+COPY docker-entrypoint.sh /usr/local/bin/
+
+WORKDIR /app/connectors
+
+ENTRYPOINT ["docker-entrypoint.sh"]
+
+ARG TARGET=web
+ENV TARGET=${TARGET}
+
+ENV USE_TEMPORAL_BUNDLES=true
+
+CMD if [ "$TARGET" = "worker" ]; then \
+      node dist/start_worker.js; \
+    else \
+      node dist/start_server.js -p 3002; \
+    fi
+
+EXPOSE 3002

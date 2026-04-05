@@ -54,6 +54,13 @@ export async function getConnectionOptions(
     }
   | Record<string, never>
 > {
+  // TEMPORAL_ADDRESS takes priority — used by Docker Compose to connect
+  // to the Temporal container without TLS.
+  const address = process.env.TEMPORAL_ADDRESS;
+  if (address) {
+    return { address, tls: undefined };
+  }
+
   const { NODE_ENV = "development" } = process.env;
   const isDeployed = ["production", "staging"].includes(NODE_ENV);
 

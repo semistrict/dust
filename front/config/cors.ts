@@ -33,6 +33,15 @@ const ALLOWED_ORIGIN_PATTERNS = [
 type StaticAllowedOriginType = (typeof STATIC_ALLOWED_ORIGINS)[number];
 
 export function isAllowedOrigin(origin: string): boolean {
+  // In development, allow localhost origins (any port) for Docker Compose.
+  if (
+    process.env.IS_DEVELOPMENT === "true" &&
+    (origin.startsWith("http://localhost:") ||
+      origin.startsWith("http://127.0.0.1:"))
+  ) {
+    return true;
+  }
+
   return (
     STATIC_ALLOWED_ORIGINS.includes(origin as StaticAllowedOriginType) ||
     ALLOWED_ORIGIN_PATTERNS.some((pattern) => pattern.test(origin))

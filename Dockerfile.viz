@@ -1,0 +1,36 @@
+FROM node:22.22.0-bookworm-slim AS base
+WORKDIR /app
+
+# Install dependencies
+FROM base AS deps
+RUN corepack enable npm
+COPY package.json package-lock.json ./
+COPY viz/package.json viz/
+COPY front/package.json front/
+COPY connectors/package.json connectors/
+COPY sparkle/package.json sparkle/
+COPY sdks/js/package.json sdks/js/
+COPY cli/dust-cli/package.json cli/dust-cli/
+COPY extension/package.json extension/
+COPY front-spa/package.json front-spa/
+RUN npm ci
+
+# Build
+FROM base AS builder
+COPY --from=deps /app/ ./
+COPY viz/ viz/
+
+WORKDIR /app/viz
+RUN npm run build
+
+# Runner
+FROM base AS runner
+ENV NODE_ENV=production
+
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/viz ./viz
+COPY --from=builder /app/package.json ./
+
+WORKDIR /app/viz
+CMD ["npx", "next", "start", "-p", "3100"]
+EXPOSE 3100
