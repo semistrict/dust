@@ -76,6 +76,20 @@ export async function contentsToActivitySteps(
           id: `cot-${c.step}-${index}`,
         });
       }
+
+      // Create a content step for intermediate text (followed by a function call).
+      // The last text segment stays as the message body and is not a content step.
+      const isFollowedByFunctionCall = contents
+        .slice(index + 1)
+        .some((cc) => isAgentFunctionCallContent(cc.content));
+
+      if (isFollowedByFunctionCall && parsedContent.content?.trim()) {
+        steps.push({
+          type: "content",
+          content: parsedContent.content,
+          id: `content-${c.step}-${index}`,
+        });
+      }
       continue;
     }
 

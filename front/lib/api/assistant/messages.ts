@@ -24,6 +24,7 @@ import type {
   AgentReasoningContentType,
   AgentTextContentType,
 } from "@app/types/assistant/agent_message_content";
+import { isAgentFunctionCallContent } from "@app/types/assistant/agent_message_content";
 import type {
   AgentMessageType,
   LegacyLightMessageType,
@@ -713,8 +714,35 @@ async function batchRenderAgentMessages<V extends RenderMessageVariant>(
           agentConfiguration,
           message.sId
         );
+
+        const lightMessage = getLightAgentMessageFromAgentMessage(m);
+
+        // When function calls are present, intermediate text lives in content
+        // activity steps. The message body should only contain the final text
+        // segment. The reasoning path already uses the last fragment (line ~597).
+        const hasFunctionCalls = agentStepContents.some((c) =>
+          isAgentFunctionCallContent(c.content)
+        );
+        let bodyContent = lightMessage.content;
+        if (
+          hasFunctionCalls &&
+          textContents.length > 1 &&
+          reasoningContents.length === 0
+        ) {
+          const parser = new AgentMessageContentParser(
+            agentConfiguration,
+            message.sId,
+            getCoTDelimitersConfiguration({ agentConfiguration })
+          );
+          const parsed = await parser.parseContents([
+            textContents[textContents.length - 1].content.value,
+          ]);
+          bodyContent = parsed.content;
+        }
+
         return new Ok({
-          ...getLightAgentMessageFromAgentMessage(m),
+          ...lightMessage,
+          content: bodyContent,
           activitySteps,
         });
       }

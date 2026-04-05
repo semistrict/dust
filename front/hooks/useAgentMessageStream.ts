@@ -166,6 +166,27 @@ function appendThinkingStep(
   return [...steps, { type: "thinking", content: cotContent, id }];
 }
 
+/**
+ * Append a content step to the inline activity steps if the content
+ * is new (not a duplicate of the last content step).
+ */
+function appendContentStep(
+  steps: InlineActivityStep[],
+  textContent: string,
+  id: string
+): InlineActivityStep[] {
+  for (let i = steps.length - 1; i >= 0; i--) {
+    const step = steps[i];
+    if (step.type === "content") {
+      if (step.content === textContent) {
+        return steps;
+      }
+      break;
+    }
+  }
+  return [...steps, { type: "content", content: textContent, id }];
+}
+
 interface UseAgentMessageStreamParams {
   agentMessage: MessageTemporaryState;
   conversationId: string | null;
@@ -204,8 +225,10 @@ export function useAgentMessageStream({
 
   const chainOfThought = useRef(agentMessage.chainOfThought ?? "");
   const content = useRef(agentMessage.content ?? "");
-  // Tracks whether response token generation has started, to flush CoT once.
-  const writingStarted = useRef(false);
+  // Tracks the last token classification to detect transitions between
+  // thinking (chain_of_thought) and writing (tokens), flushing completed
+  // segments as activity steps on each switch.
+  const lastClassification = useRef<"tokens" | "chain_of_thought" | null>(null);
 
   const buildEventSourceURL = useCallback(
     (lastEvent: string | null) => {
@@ -264,32 +287,84 @@ export function useAgentMessageStream({
             classification === "tokens" ||
             classification === "chain_of_thought"
           ) {
-            // First "tokens" event means thinking → writing: flush pending CoT once.
+            // Detect classification transitions and flush completed segments.
             if (
               classification === "tokens" &&
-              !writingStarted.current &&
-              chainOfThought.current
+              lastClassification.current !== "tokens"
             ) {
-              writingStarted.current = true;
-              const cotToFlush = chainOfThought.current;
-              chainOfThought.current = "";
-              methods.data.map((m) => {
-                if (!isMessageTemporayState(m) || m.sId !== sId) {
-                  return m;
-                }
-                return {
-                  ...m,
-                  streaming: {
-                    ...m.streaming,
-                    inlineActivitySteps: appendThinkingStep(
-                      m.streaming.inlineActivitySteps,
-                      cotToFlush,
-                      `thinking-pretokens-${Date.now()}`
-                    ),
-                  },
-                };
-              });
+              // Transition to tokens (thinking → writing): flush pending CoT.
+              if (chainOfThought.current) {
+                const cotToFlush = chainOfThought.current;
+                chainOfThought.current = "";
+                methods.data.map((m) => {
+                  if (!isMessageTemporayState(m) || m.sId !== sId) {
+                    return m;
+                  }
+                  return {
+                    ...m,
+                    streaming: {
+                      ...m.streaming,
+                      agentState: "writing",
+                      inlineActivitySteps: appendThinkingStep(
+                        m.streaming.inlineActivitySteps,
+                        cotToFlush,
+                        `thinking-pretokens-${Date.now()}`
+                      ),
+                    },
+                  };
+                });
+              } else {
+                // No CoT to flush, just set state to writing.
+                methods.data.map((m) => {
+                  if (!isMessageTemporayState(m) || m.sId !== sId) {
+                    return m;
+                  }
+                  return {
+                    ...m,
+                    streaming: { ...m.streaming, agentState: "writing" },
+                  };
+                });
+              }
+            } else if (
+              classification === "chain_of_thought" &&
+              lastClassification.current === "tokens"
+            ) {
+              // Transition to CoT (writing → thinking): flush pending content.
+              if (content.current) {
+                const contentToFlush = content.current;
+                content.current = "";
+                methods.data.map((m) => {
+                  if (!isMessageTemporayState(m) || m.sId !== sId) {
+                    return m;
+                  }
+                  return {
+                    ...m,
+                    content: "",
+                    streaming: {
+                      ...m.streaming,
+                      agentState: "thinking",
+                      inlineActivitySteps: appendContentStep(
+                        m.streaming.inlineActivitySteps,
+                        contentToFlush,
+                        `content-pretokens-${Date.now()}`
+                      ),
+                    },
+                  };
+                });
+              } else {
+                methods.data.map((m) => {
+                  if (!isMessageTemporayState(m) || m.sId !== sId) {
+                    return m;
+                  }
+                  return {
+                    ...m,
+                    streaming: { ...m.streaming, agentState: "thinking" },
+                  };
+                });
+              }
             }
+
+            lastClassification.current = classification;
 
             if (classification === "tokens") {
               content.current += generationTokens.text;
@@ -347,23 +422,34 @@ export function useAgentMessageStream({
 
         case "tool_params":
           const toolParams = eventPayload.data;
-          writingStarted.current = false;
-          // Snapshot CoT before it gets cleared by updateMessageWithAction.
+          lastClassification.current = null;
+          // Snapshot CoT and content before they get cleared.
           const cotAtToolParams = chainOfThought.current;
           chainOfThought.current = "";
+          const contentAtToolParams = content.current;
+          content.current = "";
           methods.data.map((m) => {
             if (!isMessageTemporayState(m) || m.sId !== sId) {
               return m;
             }
-            const steps = cotAtToolParams
-              ? appendThinkingStep(
-                  m.streaming.inlineActivitySteps,
-                  cotAtToolParams,
-                  `thinking-${Date.now()}`
-                )
-              : m.streaming.inlineActivitySteps;
+            let steps = m.streaming.inlineActivitySteps;
+            if (cotAtToolParams) {
+              steps = appendThinkingStep(
+                steps,
+                cotAtToolParams,
+                `thinking-${Date.now()}`
+              );
+            }
+            if (contentAtToolParams) {
+              steps = appendContentStep(
+                steps,
+                contentAtToolParams,
+                `content-${Date.now()}`
+              );
+            }
             return {
               ...updateMessageWithAction(m, toolParams.action),
+              content: "",
               streaming: {
                 ...m.streaming,
                 agentState: "acting",
@@ -390,17 +476,27 @@ export function useAgentMessageStream({
           const error = eventPayload.data.error;
           const cotAtError = chainOfThought.current;
           chainOfThought.current = "";
+          const contentAtError = content.current;
+          content.current = "";
           methods.data.map((m) => {
             if (!isMessageTemporayState(m) || m.sId !== sId) {
               return m;
             }
-            const steps = cotAtError
-              ? appendThinkingStep(
-                  m.streaming.inlineActivitySteps,
-                  cotAtError,
-                  `thinking-error-${Date.now()}`
-                )
-              : m.streaming.inlineActivitySteps;
+            let steps = m.streaming.inlineActivitySteps;
+            if (cotAtError) {
+              steps = appendThinkingStep(
+                steps,
+                cotAtError,
+                `thinking-error-${Date.now()}`
+              );
+            }
+            if (contentAtError) {
+              steps = appendContentStep(
+                steps,
+                contentAtError,
+                `content-error-${Date.now()}`
+              );
+            }
             return {
               ...m,
               status: "failed",
@@ -425,20 +521,42 @@ export function useAgentMessageStream({
           );
           break;
 
-        case "agent_generation_cancelled":
-          methods.data.map((m) =>
-            isMessageTemporayState(m) && m.sId === sId
-              ? {
-                  ...m,
-                  status: "cancelled",
-                  streaming: {
-                    ...m.streaming,
-                    agentState: "done",
-                  },
-                }
-              : m
-          );
+        case "agent_generation_cancelled": {
+          const cotAtCancel = chainOfThought.current;
+          chainOfThought.current = "";
+          const contentAtCancel = content.current;
+          content.current = "";
+          methods.data.map((m) => {
+            if (!isMessageTemporayState(m) || m.sId !== sId) {
+              return m;
+            }
+            let steps = m.streaming.inlineActivitySteps;
+            if (cotAtCancel) {
+              steps = appendThinkingStep(
+                steps,
+                cotAtCancel,
+                `thinking-cancel-${Date.now()}`
+              );
+            }
+            if (contentAtCancel) {
+              steps = appendContentStep(
+                steps,
+                contentAtCancel,
+                `content-cancel-${Date.now()}`
+              );
+            }
+            return {
+              ...m,
+              status: "cancelled",
+              streaming: {
+                ...m.streaming,
+                agentState: "done",
+                inlineActivitySteps: steps,
+              },
+            };
+          });
           break;
+        }
 
         case "agent_message_gracefully_stopped":
         case "agent_message_success": {
@@ -446,6 +564,10 @@ export function useAgentMessageStream({
           // Safety net: flush any remaining CoT not yet captured.
           const cotAtSuccess = chainOfThought.current;
           chainOfThought.current = "";
+          // Preserve final content segment — the server message includes ALL
+          // text (intermediate + final), but we only want the final segment
+          // as the message body since intermediate text lives in content steps.
+          const finalContent = content.current;
           methods.data.map((m) => {
             if (!isMessageTemporayState(m) || m.sId !== sId) {
               return m;
@@ -457,9 +579,16 @@ export function useAgentMessageStream({
                   `thinking-final-${Date.now()}`
                 )
               : m.streaming.inlineActivitySteps;
+            const merged = getLightAgentMessageFromAgentMessage(
+              messageSuccess.message
+            );
             return {
               ...m,
-              ...getLightAgentMessageFromAgentMessage(messageSuccess.message),
+              ...merged,
+              // Override server content with the final segment only.
+              // Falls back to server content when no tool calls occurred
+              // (finalContent already has the full text in that case).
+              content: finalContent || merged.content,
               streaming: {
                 ...m.streaming,
                 agentState: "done",
