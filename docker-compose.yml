@@ -295,6 +295,7 @@ services:
     environment:
       - NODE_ENV=development
       - IS_DEVELOPMENT=true
+      - DUST_DISABLE_PAYWALL=true
       - PORT=3000
       - WORKOS_API_HOSTNAME=fake-workos:7600
       - WORKOS_AUTHORIZE_HOSTNAME=localhost:7600
