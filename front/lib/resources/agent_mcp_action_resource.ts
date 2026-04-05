@@ -170,13 +170,21 @@ export class AgentMCPActionResource extends BaseResource<AgentMCPActionModel> {
       blob.toolConfiguration.toolServerId
     );
 
-    const action = await AgentMCPActionModel.create(
-      {
+    // Use findOrCreate to handle Temporal activity retries gracefully.
+    // A retry may re-execute after the previous attempt partially inserted rows.
+    const [action] = await AgentMCPActionModel.findOrCreate({
+      where: {
+        workspaceId: workspace.id,
+        agentMessageId: blob.agentMessageId,
+        stepContentId: blob.stepContentId,
+        version: blob.version,
+      },
+      defaults: {
         ...blob,
         workspaceId: workspace.id,
       },
-      { transaction }
-    );
+      transaction,
+    });
 
     const stepContent = await AgentStepContentResource.fetchByModelIdWithAuth(
       auth,

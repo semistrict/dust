@@ -11,6 +11,7 @@ export const ALL_PROVIDERS_SELECTED: ProvidersSelection = {
   deepseek: true,
   fireworks: true,
   xai: true,
+  openrouter: true,
   noop: true,
 };
 
@@ -23,6 +24,7 @@ export const NO_PROVIDERS_SELECTED: ProvidersSelection = {
   deepseek: false,
   fireworks: false,
   xai: false,
+  openrouter: false,
   noop: false,
 };
 
@@ -35,5 +37,6 @@ export const PRETTIFIED_PROVIDER_NAMES: Record<ModelProviderIdType, string> = {
   deepseek: "Deepseek",
   fireworks: "Fireworks",
   xai: "xAI",
+  openrouter: "OpenRouter",
   noop: "noop",
 };

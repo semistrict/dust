@@ -3,8 +3,7 @@ import type { ModelConfigurationType } from "./types";
 // OpenRouter model IDs use the format "provider/model-name".
 
 // OpenAI
-export const OPENROUTER_OPENAI_GPT_5_4_MODEL_ID =
-  "openai/gpt-5.4" as const;
+export const OPENROUTER_OPENAI_GPT_5_4_MODEL_ID = "openai/gpt-5.4" as const;
 export const OPENROUTER_OPENAI_GPT_5_4_MINI_MODEL_ID =
   "openai/gpt-5.4-mini" as const;
 export const OPENROUTER_OPENAI_GPT_5_4_NANO_MODEL_ID =
@@ -106,8 +105,7 @@ export const OPENROUTER_ANTHROPIC_CLAUDE_SONNET_4_6_MODEL_CONFIG: ModelConfigura
     recommendedTopK: 32,
     recommendedExhaustiveTopK: 64,
     largeModel: true,
-    description:
-      "Anthropic's Claude Sonnet 4.6 via OpenRouter (1M context).",
+    description: "Anthropic's Claude Sonnet 4.6 via OpenRouter (1M context).",
     shortDescription: "Claude Sonnet 4.6 via OpenRouter.",
     isLegacy: false,
     isLatest: true,
@@ -117,7 +115,7 @@ export const OPENROUTER_ANTHROPIC_CLAUDE_SONNET_4_6_MODEL_CONFIG: ModelConfigura
     maximumReasoningEffort: "none",
     defaultReasoningEffort: "none",
     supportsResponseFormat: true,
-    tokenizer: { type: "claude" },
+    tokenizer: { type: "tiktoken", base: "anthropic_base" },
   };
 
 export const OPENROUTER_ANTHROPIC_CLAUDE_OPUS_4_6_MODEL_CONFIG: ModelConfigurationType =
@@ -129,8 +127,7 @@ export const OPENROUTER_ANTHROPIC_CLAUDE_OPUS_4_6_MODEL_CONFIG: ModelConfigurati
     recommendedTopK: 32,
     recommendedExhaustiveTopK: 64,
     largeModel: true,
-    description:
-      "Anthropic's Claude Opus 4.6 via OpenRouter (1M context).",
+    description: "Anthropic's Claude Opus 4.6 via OpenRouter (1M context).",
     shortDescription: "Claude Opus 4.6 via OpenRouter.",
     isLegacy: false,
     isLatest: true,
@@ -140,7 +137,7 @@ export const OPENROUTER_ANTHROPIC_CLAUDE_OPUS_4_6_MODEL_CONFIG: ModelConfigurati
     maximumReasoningEffort: "none",
     defaultReasoningEffort: "none",
     supportsResponseFormat: true,
-    tokenizer: { type: "claude" },
+    tokenizer: { type: "tiktoken", base: "anthropic_base" },
   };
 
 export const OPENROUTER_GOOGLE_GEMINI_3_1_PRO_MODEL_CONFIG: ModelConfigurationType =
@@ -152,8 +149,7 @@ export const OPENROUTER_GOOGLE_GEMINI_3_1_PRO_MODEL_CONFIG: ModelConfigurationTy
     recommendedTopK: 32,
     recommendedExhaustiveTopK: 64,
     largeModel: true,
-    description:
-      "Google's Gemini 3.1 Pro via OpenRouter (1M context).",
+    description: "Google's Gemini 3.1 Pro via OpenRouter (1M context).",
     shortDescription: "Gemini 3.1 Pro via OpenRouter.",
     isLegacy: false,
     isLatest: true,
@@ -175,8 +171,7 @@ export const OPENROUTER_GOOGLE_GEMINI_3_FLASH_MODEL_CONFIG: ModelConfigurationTy
     recommendedTopK: 32,
     recommendedExhaustiveTopK: 64,
     largeModel: false,
-    description:
-      "Google's Gemini 3 Flash via OpenRouter (1M context).",
+    description: "Google's Gemini 3 Flash via OpenRouter (1M context).",
     shortDescription: "Gemini 3 Flash via OpenRouter.",
     isLegacy: false,
     isLatest: true,
@@ -219,8 +214,7 @@ export const OPENROUTER_XIAOMI_MIMO_V2_PRO_MODEL_CONFIG: ModelConfigurationType 
     recommendedTopK: 32,
     recommendedExhaustiveTopK: 64,
     largeModel: true,
-    description:
-      "Xiaomi's MiMo V2 Pro via OpenRouter (1M context).",
+    description: "Xiaomi's MiMo V2 Pro via OpenRouter (1M context).",
     shortDescription: "MiMo V2 Pro via OpenRouter.",
     isLegacy: false,
     isLatest: true,
