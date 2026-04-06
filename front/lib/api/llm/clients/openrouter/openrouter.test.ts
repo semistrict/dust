@@ -140,6 +140,7 @@ describe("OpenRouter Responses API payload", () => {
         messages: [
           {
             role: "user",
+            name: "user",
             content: [{ type: "text", text: "Hello" }],
           },
         ],
@@ -167,6 +168,7 @@ describe("OpenRouter Responses API payload", () => {
         messages: [
           {
             role: "user",
+            name: "user",
             content: [{ type: "text", text: "Run echo hello" }],
           },
         ],

@@ -6,6 +6,22 @@ import {
 import { toTool } from "@app/lib/api/llm/utils/openai_like/responses/conversation_to_openai";
 import { describe, expect, it } from "vitest";
 
+function asFunctionTool(tool: unknown): {
+  function: {
+    name: string;
+    strict?: boolean;
+    parameters?: unknown;
+  };
+} {
+  return tool as {
+    function: {
+      name: string;
+      strict?: boolean;
+      parameters?: unknown;
+    };
+  };
+}
+
 // Realistic sandbox bash tool specification — the tool that exposed the bug.
 const BASH_SPEC: AgentActionSpecification = {
   name: "bash",
@@ -50,7 +66,7 @@ const SEARCH_SPEC: AgentActionSpecification = {
 describe("toTools (Chat Completions format)", () => {
   it("preserves the original required array from inputSchema", () => {
     const tools = toTools([BASH_SPEC]);
-    const params = tools[0].function.parameters as {
+    const params = asFunctionTool(tools[0]).function.parameters as {
       required?: string[];
     };
 
@@ -61,12 +77,12 @@ describe("toTools (Chat Completions format)", () => {
   it("sets strict: false to avoid schema validation rejections", () => {
     const tools = toTools([BASH_SPEC]);
 
-    expect(tools[0].function.strict).toBe(false);
+    expect(asFunctionTool(tools[0]).function.strict).toBe(false);
   });
 
   it("preserves additionalProperties from inputSchema", () => {
     const tools = toTools([BASH_SPEC]);
-    const params = tools[0].function.parameters as {
+    const params = asFunctionTool(tools[0]).function.parameters as {
       additionalProperties?: boolean;
     };
 
@@ -75,7 +91,7 @@ describe("toTools (Chat Completions format)", () => {
 
   it("includes all properties from the input schema", () => {
     const tools = toTools([BASH_SPEC]);
-    const params = tools[0].function.parameters as {
+    const params = asFunctionTool(tools[0]).function.parameters as {
       properties?: Record<string, unknown>;
     };
 
@@ -90,8 +106,8 @@ describe("toTools (Chat Completions format)", () => {
     const tools = toTools([BASH_SPEC, SEARCH_SPEC]);
 
     expect(tools).toHaveLength(2);
-    expect(tools[0].function.name).toBe("bash");
-    expect(tools[1].function.name).toBe("search");
+    expect(asFunctionTool(tools[0]).function.name).toBe("bash");
+    expect(asFunctionTool(tools[1]).function.name).toBe("search");
   });
 
   it("handles empty specifications", () => {
@@ -104,11 +120,13 @@ describe("toTools (Chat Completions format)", () => {
     const responsesTool = toTool(BASH_SPEC);
 
     // Both should have strict: false.
-    expect(chatTool.function.strict).toBe(false);
+    expect(asFunctionTool(chatTool).function.strict).toBe(false);
     expect(responsesTool.strict).toBe(false);
 
     // Both should preserve the original required array.
-    const chatParams = chatTool.function.parameters as { required?: string[] };
+    const chatParams = asFunctionTool(chatTool).function.parameters as {
+      required?: string[];
+    };
     const responsesParams = responsesTool.parameters as {
       required?: string[];
     };
@@ -116,7 +134,9 @@ describe("toTools (Chat Completions format)", () => {
 
     // Both should have the same properties.
     const chatProps = (
-      chatTool.function.parameters as { properties?: Record<string, unknown> }
+      asFunctionTool(chatTool).function.parameters as {
+        properties?: Record<string, unknown>;
+      }
     ).properties;
     const responsesProps = (
       responsesTool.parameters as { properties?: Record<string, unknown> }
