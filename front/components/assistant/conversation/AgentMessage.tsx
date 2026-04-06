@@ -16,6 +16,7 @@ import { GoogleDriveFileAuthorizationRequired } from "@app/components/assistant/
 import { useAutoOpenInteractiveContent } from "@app/components/assistant/conversation/interactive_content/useAutoOpenInteractiveContent";
 import { MCPServerPersonalAuthenticationRequired } from "@app/components/assistant/conversation/MCPServerPersonalAuthenticationRequired";
 import { MCPToolValidationRequired } from "@app/components/assistant/conversation/MCPToolValidationRequired";
+import { useVirtuosoMethods } from "@app/components/assistant/conversation/message_list";
 import type {
   AgentMessageStateWithControlEvent,
   MessageTemporaryState,
@@ -105,7 +106,6 @@ import {
   TruncatedContent,
   useCopyToClipboard,
 } from "@dust-tt/sparkle";
-import { useVirtuosoMethods } from "@virtuoso.dev/message-list";
 import { marked } from "marked";
 import {
   type ReactElement,

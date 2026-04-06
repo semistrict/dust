@@ -6,6 +6,7 @@ import type { FeedbackSelectorBaseProps } from "@app/components/assistant/conver
 import { MentionInvalid } from "@app/components/assistant/conversation/MentionInvalid";
 import { MentionValidationRequired } from "@app/components/assistant/conversation/MentionValidationRequired";
 import { MessageDateIndicator } from "@app/components/assistant/conversation/MessageDateIndicator";
+import { useVirtuosoMethods } from "@app/components/assistant/conversation/message_list";
 import type {
   VirtuosoMessage,
   VirtuosoMessageListContext,
@@ -22,7 +23,6 @@ import { useReaction } from "@app/hooks/useReaction";
 import { useSubmitFunction } from "@app/lib/client/utils";
 import { classNames } from "@app/lib/utils";
 import type { UserType } from "@app/types/user";
-import { useVirtuosoMethods } from "@virtuoso.dev/message-list";
 import React, { useMemo } from "react";
 
 interface MessageItemProps {

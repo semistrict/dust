@@ -12,6 +12,12 @@ import {
   createPlaceholderUserMessage,
 } from "@app/components/assistant/conversation/lib";
 import { MessageItem } from "@app/components/assistant/conversation/MessageItem";
+import {
+  type ListScrollLocation,
+  VirtuosoMessageList,
+  VirtuosoMessageListLicense,
+  type VirtuosoMessageListMethods,
+} from "@app/components/assistant/conversation/message_list";
 import type {
   VirtuosoMessage,
   VirtuosoMessageListContext,
@@ -61,14 +67,6 @@ import type { Result } from "@app/types/shared/result";
 import { Err, Ok } from "@app/types/shared/result";
 import type { UserType, WorkspaceType } from "@app/types/user";
 import { cn } from "@dust-tt/sparkle";
-import type {
-  ListScrollLocation,
-  VirtuosoMessageListMethods,
-} from "@virtuoso.dev/message-list";
-import {
-  VirtuosoMessageList,
-  VirtuosoMessageListLicense,
-} from "@virtuoso.dev/message-list";
 import debounce from "lodash/debounce";
 // biome-ignore lint/correctness/noUnusedImports: ignored using `--suppress`
 import React, {
@@ -769,18 +767,20 @@ export const ConversationViewer = ({
                   behavior: customSmoothScroll,
                 };
               }
-            : (params) => {
-                if (params.scrollLocation.bottomOffset >= 0) {
-                  return {
-                    index: "LAST",
-                    align: "end",
-                    behavior: customSmoothScroll,
-                  };
-                } else {
-                  return false;
-                }
-              }
+            : true
         );
+
+        if (!isMentioningAgent) {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              ref.current?.scrollToItem({
+                index: "LAST",
+                align: "end",
+                behavior: "instant",
+              });
+            });
+          });
+        }
 
         const result = await submitMessage(messageData);
 

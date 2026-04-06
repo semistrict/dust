@@ -1,13 +1,16 @@
 import { useBlockedActionsContext } from "@app/components/assistant/conversation/BlockedActionsProvider";
 import { GenerationContext } from "@app/components/assistant/conversation/GenerationContextProvider";
 import { InputBar } from "@app/components/assistant/conversation/input_bar/InputBar";
+import {
+  useVirtuosoLocation,
+  useVirtuosoMethods,
+} from "@app/components/assistant/conversation/message_list";
 import type {
   VirtuosoMessage,
   VirtuosoMessageListContext,
 } from "@app/components/assistant/conversation/types";
 import {
   isHandoverUserMessage,
-  isHiddenMessage,
   isMessageTemporayState,
   isUserMessage,
 } from "@app/components/assistant/conversation/types";
@@ -22,7 +25,6 @@ import { pluralize } from "@app/types/shared/utils/string_utils";
 import {
   AnimatedText,
   ArrowDownIcon,
-  ArrowUpIcon,
   Button,
   ContentMessageAction,
   ContentMessageInline,
@@ -31,11 +33,7 @@ import {
   SparklesIcon,
   StopIcon,
 } from "@dust-tt/sparkle";
-import {
-  useVirtuosoLocation,
-  useVirtuosoMethods,
-} from "@virtuoso.dev/message-list";
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 const MAX_DISTANCE_FOR_SMOOTH_SCROLL = 2048;
 
@@ -62,7 +60,7 @@ export const AgentInputBar = ({
 
   const isMobile = useIsMobile();
   const methods = useVirtuosoMethods<VirtuosoMessage>();
-  const { bottomOffset, listOffset, visibleListHeight } = useVirtuosoLocation();
+  const { bottomOffset } = useVirtuosoLocation();
 
   const lastUserMessage = methods.data
     .get()
@@ -94,93 +92,17 @@ export const AgentInputBar = ({
     return lastUserMessage.richMentions;
   }, [draftAgent, lastUserMessage]);
 
-  // Calculate positions and determine which user messages are navigable.
-  const {
-    canScrollUp,
-    canScrollDown,
-    scrollToPreviousUserMessage,
-    scrollToNextUserMessage,
-  } = useMemo(() => {
-    const allMessages = methods.data.get();
+  const canScrollToBottom =
+    bottomOffset > 0 && !methods.getScrollLocation().isAtBottom;
 
-    // Find indices of visible (non-hidden) user messages.
-    const userMessageIndices: number[] = [];
-    for (let i = 0; i < allMessages.length; i++) {
-      const msg = allMessages[i];
-      if (isUserMessage(msg) && !isHiddenMessage(msg)) {
-        userMessageIndices.push(i);
-      }
-    }
-
-    // Calculate positions by accumulating heights.
-    const positions: { top: number; bottom: number }[] = [];
-    let accumulatedHeight = 0;
-    for (const msg of allMessages) {
-      const height = methods.height(msg);
-      positions.push({
-        top: accumulatedHeight,
-        bottom: accumulatedHeight + height,
-      });
-      accumulatedHeight += height;
-    }
-
-    // Convert listOffset to positive scroll position.
-    // listOffset is negative when scrolled down (distance from list top to viewport top).
-    const viewportTop = -listOffset;
-    const viewportTopQuarter = viewportTop + visibleListHeight / 4;
-
-    // Find user messages fully above viewport (for arrow up).
-    const fullyAboveIndices = userMessageIndices.filter(
-      (idx) => positions[idx] && positions[idx].bottom <= viewportTop
-    );
-
-    // Find user messages whose top is below the top quarter of viewport (for arrow down).
-    const belowTopQuarterIndices = userMessageIndices.filter(
-      (idx) => positions[idx] && positions[idx].top >= viewportTopQuarter
-    );
-
-    const canUp = fullyAboveIndices.length > 0;
-    const canDown =
-      (belowTopQuarterIndices.length > 0 || bottomOffset > 0) &&
-      !methods.getScrollLocation().isAtBottom;
-
-    return {
-      canScrollUp: canUp,
-      canScrollDown: canDown,
-      scrollToPreviousUserMessage: () => {
-        if (fullyAboveIndices.length > 0) {
-          // Scroll to the last user message that's fully above (closest to current view).
-          const targetIndex = fullyAboveIndices[fullyAboveIndices.length - 1];
-          methods.scrollToItem({
-            index: targetIndex,
-            align: "start",
-            behavior: "smooth",
-          });
-        }
-      },
-      scrollToNextUserMessage: () => {
-        if (belowTopQuarterIndices.length > 0) {
-          // Scroll to the first user message below top quarter.
-          const targetIndex = belowTopQuarterIndices[0];
-          methods.scrollToItem({
-            index: targetIndex,
-            align: "start",
-            behavior: "smooth",
-          });
-        } else if (bottomOffset > 0) {
-          // No more user messages below, but there's content - scroll to bottom.
-          methods.scrollToItem({
-            index: "LAST",
-            align: "end",
-            behavior:
-              bottomOffset < MAX_DISTANCE_FOR_SMOOTH_SCROLL
-                ? "smooth"
-                : "instant",
-          });
-        }
-      },
-    };
-  }, [methods, listOffset, visibleListHeight, bottomOffset]);
+  const scrollToBottom = useCallback(() => {
+    methods.scrollToItem({
+      index: "LAST",
+      align: "end",
+      behavior:
+        bottomOffset < MAX_DISTANCE_FOR_SMOOTH_SCROLL ? "smooth" : "instant",
+    });
+  }, [bottomOffset, methods]);
 
   const blockedActions = getBlockedActions(context.user.sId);
 
@@ -234,7 +156,8 @@ export const AgentInputBar = ({
     );
 
   const showStopButton = generatingMessages.length > 0;
-  const showMessageNavigation = !context.agentBuilderContext;
+  const showMessageNavigation =
+    !context.agentBuilderContext && canScrollToBottom;
   const showButlerThinking = context.isButlerThinking;
   const showNavigationContainer =
     showStopButton || showMessageNavigation || showButlerThinking;
@@ -293,18 +216,11 @@ export const AgentInputBar = ({
             {showMessageNavigation && (
               <>
                 <IconButton
-                  icon={ArrowUpIcon}
-                  onClick={scrollToPreviousUserMessage}
-                  disabled={!canScrollUp}
-                  size="xs"
-                  tooltip="Previous user message"
-                />
-                <IconButton
                   icon={ArrowDownIcon}
-                  onClick={scrollToNextUserMessage}
-                  disabled={!canScrollDown}
+                  onClick={scrollToBottom}
+                  disabled={!canScrollToBottom}
                   size="xs"
-                  tooltip="Next user message"
+                  tooltip="Scroll to bottom"
                 />
               </>
             )}

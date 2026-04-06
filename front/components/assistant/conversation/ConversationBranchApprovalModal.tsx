@@ -1,5 +1,6 @@
 import { AgentActionsPanelForMessage } from "@app/components/assistant/conversation/actions/AgentActionsPanel";
 import { MessageItem } from "@app/components/assistant/conversation/MessageItem";
+import { useVirtuosoMethods } from "@app/components/assistant/conversation/message_list";
 import {
   isMessageTemporayState,
   type MessageTemporaryState,
@@ -21,7 +22,6 @@ import {
   Tabs,
   TabsContent,
 } from "@dust-tt/sparkle";
-import { useVirtuosoMethods } from "@virtuoso.dev/message-list";
 import { useMemo, useState } from "react";
 
 export function ConversationBranchApprovalModal({

@@ -39,6 +39,15 @@ const COOKIE_PASSWORD =
   process.env.COOKIE_PASSWORD || "change-me-to-32-char-password-xx";
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 
+// Keep fake WorkOS ids stable across logins so Dust reuses the same local user.
+// For the seeded local dev accounts, preserve the ids that already back the
+// useful workspaces in the current dev database.
+const STABLE_LOCAL_USER_IDS = {
+  "admin@dust.local": "user_fake_4edd9f38",
+  "apitest@dust.local": "user_fake_60ecd84b",
+  "test@dust.local": "user_fake_99cfe604",
+};
+
 // In-memory state
 const pendingCodes = new Map(); // code → { user, redirectUri, state }
 const sessions = new Map(); // sessionId → { user, refreshToken }
@@ -49,12 +58,22 @@ let jwk = null;
 const users = new Map();
 
 function getOrCreateUser(email) {
-  if (!users.has(email)) {
-    const name = email.split("@")[0] || "User";
-    users.set(email, {
+  const normalizedEmail = String(email).trim().toLowerCase();
+
+  if (!users.has(normalizedEmail)) {
+    const name = normalizedEmail.split("@")[0] || "User";
+    const stableId =
+      STABLE_LOCAL_USER_IDS[normalizedEmail] ||
+      `user_fake_${crypto
+        .createHash("sha256")
+        .update(normalizedEmail)
+        .digest("hex")
+        .slice(0, 8)}`;
+
+    users.set(normalizedEmail, {
       object: "user",
-      id: `user_fake_${crypto.randomUUID().slice(0, 8)}`,
-      email,
+      id: stableId,
+      email: normalizedEmail,
       email_verified: true,
       profile_picture_url: null,
       first_name: name.charAt(0).toUpperCase() + name.slice(1),
@@ -67,7 +86,7 @@ function getOrCreateUser(email) {
       metadata: {},
     });
   }
-  return users.get(email);
+  return users.get(normalizedEmail);
 }
 
 async function initKeys() {
@@ -111,8 +130,7 @@ app.get("/sso/jwks/:clientId", (_req, res) => {
 app.get("/user_management/authorize", (req, res) => {
   const { client_id, redirect_uri, state, screen_hint } = req.query;
 
-  const title =
-    screen_hint === "sign-up" ? "Create Account" : "Sign In";
+  const title = screen_hint === "sign-up" ? "Create Account" : "Sign In";
 
   res.type("html").send(`<!DOCTYPE html>
 <html>
@@ -177,13 +195,7 @@ app.post("/user_management/authorize/submit", (req, res) => {
 // ─── Authenticate (code exchange + refresh) ──────────────────────────────────
 
 app.post("/user_management/authenticate", async (req, res) => {
-  const {
-    code,
-    grant_type,
-    refresh_token,
-    client_id,
-    session,
-  } = req.body;
+  const { code, grant_type, refresh_token, client_id, session } = req.body;
 
   try {
     // Refresh token flow
@@ -286,7 +298,9 @@ app.post("/user_management/authenticate", async (req, res) => {
     return res.json(response);
   } catch (err) {
     console.error("Authenticate error:", err);
-    return res.status(500).json({ error: "internal_error", message: String(err) });
+    return res
+      .status(500)
+      .json({ error: "internal_error", message: String(err) });
   }
 });
 
@@ -315,7 +329,10 @@ app.delete("/sso/connections/:id", (_req, res) => {
 app.get("/user_management/users", (req, res) => {
   const { email } = req.query;
   if (email && users.has(email)) {
-    res.json({ data: [users.get(email)], list_metadata: { after: null, before: null } });
+    res.json({
+      data: [users.get(email)],
+      list_metadata: { after: null, before: null },
+    });
   } else {
     res.json({ data: [], list_metadata: { after: null, before: null } });
   }
