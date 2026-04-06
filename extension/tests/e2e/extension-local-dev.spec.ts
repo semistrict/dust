@@ -5,6 +5,7 @@ import {
   expect,
   type Page,
 } from "@playwright/test";
+import { createServer, type Server } from "http";
 import { mkdtemp, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { resolve } from "path";
@@ -16,6 +17,68 @@ type ExtensionFixtures = {
 };
 
 const extensionBuildPath = resolve(__dirname, "../../platforms/chrome/build");
+
+let fixtureServer: Server | null = null;
+let fixtureServerUrl = "";
+
+async function startFixtureServer(): Promise<string> {
+  const html = `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Local Extension Fixture</title>
+  </head>
+  <body>
+    <main>
+      <article>
+        <h1>Extension Fixture</h1>
+        <p>Alpha beta gamma delta.</p>
+        <ul>
+          <li>First bullet</li>
+          <li>Second bullet</li>
+        </ul>
+      </article>
+    </main>
+  </body>
+</html>`;
+
+  return new Promise((resolveUrl, reject) => {
+    const server = createServer((_req, res) => {
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.end(html);
+    });
+
+    server.on("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      if (!address || typeof address === "string") {
+        reject(new Error("Failed to resolve fixture server address."));
+        return;
+      }
+
+      fixtureServer = server;
+      resolveUrl(`http://127.0.0.1:${address.port}/`);
+    });
+  });
+}
+
+async function sendRuntimeMessage<T>(
+  page: Page,
+  message: Record<string, unknown>
+): Promise<T> {
+  return page.evaluate((payload) => {
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(payload, (response) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+
+        resolve(response);
+      });
+    });
+  }, message) as Promise<T>;
+}
 
 const test = base.extend<ExtensionFixtures>({
   extensionContext: [
@@ -66,6 +129,30 @@ const test = base.extend<ExtensionFixtures>({
 
 test.describe
   .serial("Chrome extension local dev smoke tests", () => {
+    test.beforeAll(async () => {
+      fixtureServerUrl = await startFixtureServer();
+    });
+
+    test.afterAll(async () => {
+      if (!fixtureServer) {
+        return;
+      }
+
+      fixtureServer.closeAllConnections?.();
+
+      await new Promise<void>((resolve, reject) => {
+        fixtureServer?.close((error) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+
+          fixtureServer = null;
+          resolve();
+        });
+      });
+    });
+
     test("shows the login screen when unauthenticated", async ({
       extensionPage,
     }) => {
@@ -107,5 +194,41 @@ test.describe
       await expect(
         extensionPage.getByRole("button", { name: "Sign in" })
       ).toHaveCount(0);
+    });
+
+    test("reads the active localhost page content", async ({
+      extensionContext,
+      extensionPage,
+    }) => {
+      await expect(extensionPage).not.toHaveURL(/\/login$/);
+
+      const targetPage = await extensionContext.newPage();
+      try {
+        await targetPage.goto(fixtureServerUrl);
+        await expect(targetPage).toHaveTitle("Local Extension Fixture");
+
+        const capture = await sendRuntimeMessage<{
+          title: string;
+          url: string;
+          content?: string;
+          error?: string;
+        }>(extensionPage, {
+          type: "GET_ACTIVE_TAB",
+          includeContent: true,
+          includeCapture: false,
+        });
+
+        expect(capture.error).toBeUndefined();
+        expect(capture.title).toBe("Local Extension Fixture");
+        expect(capture.url).toBe(fixtureServerUrl);
+
+        const normalizedContent = capture.content?.replace(/\s+/g, " ").trim();
+        expect(normalizedContent).toContain("# Extension Fixture");
+        expect(normalizedContent).toContain("Alpha beta gamma delta.");
+        expect(normalizedContent).toContain("- First bullet");
+        expect(normalizedContent).toContain("- Second bullet");
+      } finally {
+        await targetPage.close();
+      }
     });
   });
