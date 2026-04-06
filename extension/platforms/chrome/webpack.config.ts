@@ -42,6 +42,8 @@ export const getConfig = async ({
   shouldBuild: "none" | "prod" | "analyze";
 }): Promise<Configuration> => {
   const isDevelopment = env === "development";
+  const useExtensionReloader =
+    isDevelopment && process.env.DISABLE_EXTENSION_RELOADER !== "1";
   const packageJson = JSON.parse(
     fs.readFileSync(path.resolve(__dirname, "../../package.json"), "utf8")
   );
@@ -240,7 +242,7 @@ export const getConfig = async ({
             filename: `Dust_Extension_Chrome.${env}.v${version}.zip`,
           })
         : null,
-      isDevelopment
+      useExtensionReloader
         ? // @ts-expect-error (it's working)
           new ExtReloader({
             port: 9090,

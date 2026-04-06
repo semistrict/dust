@@ -49,14 +49,60 @@ async function getSigningKey(jwksUri: string, kid: string): Promise<string> {
   });
 }
 
+function getWorkOSJwksUri(): string {
+  const apiHostname =
+    process.env.WORKOS_AUTHORIZE_HOSTNAME || process.env.WORKOS_API_HOSTNAME;
+
+  if (apiHostname) {
+    const protocol =
+      apiHostname.startsWith("localhost") ||
+      apiHostname.startsWith("fake-workos")
+        ? "http"
+        : "https";
+
+    return `${protocol}://${apiHostname}/sso/jwks/${config.getWorkOSClientId()}`;
+  }
+
+  return `https://api.workos.com/sso/jwks/${config.getWorkOSClientId()}`;
+}
+
+function getWorkOSIssuerUrls(): string | [string, ...string[]] {
+  const normalizeIssuer = (value: string) => value.replace(/\/$/, "");
+
+  const issuer = normalizeIssuer(config.getWorkOSIssuerURL());
+  const issuers = new Set([issuer]);
+
+  try {
+    const issuerUrl = new URL(issuer);
+
+    if (issuerUrl.hostname === "localhost") {
+      const aliasUrl = new URL(issuer);
+      aliasUrl.hostname = "fake-workos";
+      issuers.add(normalizeIssuer(aliasUrl.toString()));
+    } else if (issuerUrl.hostname === "fake-workos") {
+      const aliasUrl = new URL(issuer);
+      aliasUrl.hostname = "localhost";
+      issuers.add(normalizeIssuer(aliasUrl.toString()));
+    }
+  } catch {
+    // Fall back to the configured issuer only.
+  }
+
+  const issuerList = Array.from(issuers);
+
+  return issuerList.length === 1
+    ? issuer
+    : (issuerList as [string, ...string[]]);
+}
+
 /**
  * Verify a WorkOS token.
  */
 export async function verifyWorkOSToken(
   accessToken: string
 ): Promise<Result<WorkOSJwtPayload, Error>> {
-  const verify = `https://api.workos.com/sso/jwks/${config.getWorkOSClientId()}`;
-  const issuer = config.getWorkOSIssuerURL();
+  const verify = getWorkOSJwksUri();
+  const issuer = getWorkOSIssuerUrls();
 
   return new Promise((resolve) => {
     jwt.verify(
@@ -76,7 +122,10 @@ export async function verifyWorkOSToken(
         algorithms: ["RS256"],
         issuer: issuer,
       },
-      (err, decoded) => {
+      (
+        err: jwt.VerifyErrors | null,
+        decoded: string | jwt.JwtPayload | undefined
+      ) => {
         if (err) {
           return resolve(new Err(err));
         }

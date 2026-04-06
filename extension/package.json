@@ -4,6 +4,7 @@
   "description": "Dust Chrome Extension",
   "scripts": {
     "clean": "rm -rf build/*",
+    "build:chrome:dev": "tsx run/build-dev.ts --platform=chrome",
     "dev:chrome": "tsx run/watch.ts --platform=chrome --mode=development",
     "dev:front": "tsx run/watch.ts --platform=front --mode=development",
     "package:chrome:production": "tsx run/build.ts --platform=chrome",
@@ -13,6 +14,7 @@
     "package:chrome:release": "tsx run/build.ts --platform=chrome --release",
     "package:firefox:release": "tsx run/build.ts --platform=firefox --release",
     "analyze:chrome": "tsx run/build.ts --platform=chrome --analyze",
+    "test:e2e": "../node_modules/.bin/playwright test --config tests/e2e/playwright.config.ts",
     "tsgo": "tsgo"
   },
   "engines": {

@@ -57,14 +57,27 @@ export const useNovuClient = () => {
 
   useEffect(() => {
     if (user?.subscriberHash && user?.sId) {
-      if (!novuConfig.applicationIdentifier) {
-        throw new Error("NEXT_PUBLIC_NOVU_APPLICATION_IDENTIFIER is not set");
-      }
-      if (!novuConfig.apiUrl) {
-        throw new Error("NEXT_PUBLIC_NOVU_API_URL is not set");
-      }
-      if (!novuConfig.socketUrl) {
-        throw new Error("NEXT_PUBLIC_NOVU_WEBSOCKET_API_URL is not set");
+      if (
+        !novuConfig.applicationIdentifier ||
+        !novuConfig.apiUrl ||
+        !novuConfig.socketUrl
+      ) {
+        if (process.env.NODE_ENV !== "production") {
+          console.warn(
+            "Skipping Novu client setup because public Novu env vars are missing."
+          );
+          return;
+        }
+
+        if (!novuConfig.applicationIdentifier) {
+          throw new Error("NEXT_PUBLIC_NOVU_APPLICATION_IDENTIFIER is not set");
+        }
+        if (!novuConfig.apiUrl) {
+          throw new Error("NEXT_PUBLIC_NOVU_API_URL is not set");
+        }
+        if (!novuConfig.socketUrl) {
+          throw new Error("NEXT_PUBLIC_NOVU_WEBSOCKET_API_URL is not set");
+        }
       }
 
       const config = {
