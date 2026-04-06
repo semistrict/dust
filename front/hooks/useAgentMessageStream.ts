@@ -384,6 +384,9 @@ export function useAgentMessageStream({
           );
           break;
 
+        case "tool_call_started":
+          break;
+
         case "tool_error":
         case "agent_error":
           const error = eventPayload.data.error;
