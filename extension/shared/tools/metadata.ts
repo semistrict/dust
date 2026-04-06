@@ -7,7 +7,7 @@ export const CHROME_TOOLS_METADATA = createClientToolsRecord({
       "Extracts the title, URL, and text content of a browser tab. " +
       "Use this to read and understand what the user is viewing. " +
       "For non-text pages (PDFs, images, etc.), use take_screenshot_or_attach_file instead — it will attach the file directly to the conversation." +
-      "Use list_browser_tabs to discover tab IDs. Group by domains to fetch the content of all tabs from the same domain.",
+      "Use list_browser_tabs to discover tab IDs. In Chrome, page content can only be read from the active tab, so switch to the target tab first if needed.",
     schema: {
       tabsToFetch: z
         .string()
@@ -30,7 +30,7 @@ export const CHROME_TOOLS_METADATA = createClientToolsRecord({
       "For PDF pages, uploads the file and returns the full extracted text so you can read it. " +
       "For image pages, returns the image directly so you can visually analyze it. " +
       "For HTML pages, takes a screenshot for visual inspection (Drive canvas, dashboards, etc.)." +
-      "Use list_browser_tabs to discover tab IDs. Group by domains to fetch the content of all tabs from the same domain.",
+      "Use list_browser_tabs to discover tab IDs. In Chrome, screenshots and file capture only work on the active tab, so switch to the target tab first if needed.",
     schema: {
       tabsToFetch: z
         .string()
@@ -52,7 +52,7 @@ export const CHROME_TOOLS_METADATA = createClientToolsRecord({
       "Lists all open tabs in the current browser window with their tab ID, title, URL, and whether they are active. " +
       "The active tab (what the user is currently looking at) is marked with an asterisk (*). " +
       "Use this to discover which tabs the user has open and to identify the currently active tab. " +
-      "Tab IDs can be passed to attach_page_text or take_screenshot_or_attach_file to read a specific tab.",
+      "Tab IDs can be passed to attach_page_text or take_screenshot_or_attach_file, but in Chrome those tools require the target tab to be active.",
     schema: {},
     stake: "low",
     displayLabels: {
@@ -145,7 +145,9 @@ Important rules:
 type_text automatically focuses the element before typing.
 delete_text automatically focuses the element before deleting the text.
 For the above reasons in most cases you do NOT need to click an element before calling type_text or delete_text.
-Avoid unnecessary actions.`,
+Avoid unnecessary actions.
+
+In Chrome, page interaction is limited to the active tab. Switch to the target tab before using this tool.`,
     schema: z.object({
       action: z
         .enum(["get_elements", "click_element", "type_text", "delete_text"])

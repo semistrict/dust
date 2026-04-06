@@ -26,13 +26,6 @@
   "side_panel": {
     "default_path": "main.html"
   },
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
-      "js": ["content-script.js"],
-      "run_at": "document_end"
-    }
-  ],
   "web_accessible_resources": [
     {
       "resources": ["main.html", "main.js", "*.chunk.js", "images/*"],
@@ -41,6 +34,7 @@
   ],
   "permissions": [
     "sidePanel",
+    "activeTab",
     "identity",
     "storage",
     "tabs",
@@ -48,7 +42,6 @@
     "contextMenus"
   ],  
   "optional_permissions":["notifications"],
-  "host_permissions": ["<all_urls>"],
   "externally_connectable": {
     "matches": [
       "https://dust.tt/*",

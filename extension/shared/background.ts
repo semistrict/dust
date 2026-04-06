@@ -81,6 +81,60 @@ function withTabLock<T>(fn: () => Promise<T>): Promise<T> {
   return next;
 }
 
+const CHROME_ACTIVE_TAB_ONLY_ERROR =
+  "Chrome page access is limited to the active tab. Switch to the target tab and try again.";
+const CHROME_ACTIVE_TAB_GRANT_ERROR =
+  "Dust needs page access to the current tab. Click the extension button or use the page context menu on this tab, then try again.";
+
+function normalizePageAccessError(
+  error: unknown,
+  platform: PlatformService
+): Error {
+  const normalizedError = normalizeError(error);
+
+  if (platform.platform !== "chrome") {
+    return normalizedError;
+  }
+
+  const message = normalizedError.message.toLowerCase();
+  if (
+    message.includes("cannot access contents of url") ||
+    message.includes("missing host permission")
+  ) {
+    return new Error(CHROME_ACTIVE_TAB_GRANT_ERROR);
+  }
+
+  return normalizedError;
+}
+
+async function getAccessibleTab(
+  requestedTabId: number | undefined,
+  platform: PlatformService
+): Promise<chrome.tabs.Tab> {
+  const [activeTab] = await chrome.tabs.query({
+    active: true,
+    currentWindow: true,
+  });
+
+  if (!activeTab?.id) {
+    throw new Error("No active tab found.");
+  }
+
+  if (platform.platform === "chrome") {
+    if (requestedTabId !== undefined && requestedTabId !== activeTab.id) {
+      throw new Error(CHROME_ACTIVE_TAB_ONLY_ERROR);
+    }
+
+    return activeTab;
+  }
+
+  if (requestedTabId === undefined || requestedTabId === activeTab.id) {
+    return activeTab;
+  }
+
+  return chrome.tabs.get(requestedTabId);
+}
+
 const shouldDisableContextMenuForDomain = async (
   url: string,
   platform: PlatformService
@@ -579,36 +633,23 @@ export const registerMessageListener = (platform: PlatformService) => {
         case "GET_ACTIVE_TAB":
           void (async () => {
             let tab: chrome.tabs.Tab | undefined;
-            if (message.tabId) {
-              tab = await chrome.tabs.get(message.tabId);
-            } else {
-              const tabs = await chrome.tabs.query({
-                active: true,
-                currentWindow: true,
-              });
-              tab = tabs[0];
-            }
-
-            if (!tab?.id) {
-              log("No active tab found.");
-              sendResponse({ url: "", content: "", title: "" });
-              return;
-            }
-
-            if (
-              tab.url &&
-              (await shouldDisableContextMenuForDomain(tab.url, platform))
-            ) {
-              sendResponse({
-                url: tab.url || "",
-                content: "",
-                title: "",
-                error: "Capture is disabled for this domain.",
-              });
-              return;
-            }
 
             try {
+              tab = await getAccessibleTab(message.tabId, platform);
+
+              if (
+                tab.url &&
+                (await shouldDisableContextMenuForDomain(tab.url, platform))
+              ) {
+                sendResponse({
+                  url: tab.url || "",
+                  content: "",
+                  title: "",
+                  error: "Capture is disabled for this domain.",
+                });
+                return;
+              }
+
               const includeContent = message.includeContent ?? true;
               const includeCapture = message.includeCapture ?? false;
               const [mimetypeExecution] = await chrome.scripting.executeScript({
@@ -836,15 +877,13 @@ export const registerMessageListener = (platform: PlatformService) => {
                 fileData,
               });
             } catch (error) {
-              log("Error getting active tab content:", error);
+              const normalizedError = normalizePageAccessError(error, platform);
+              log("Error getting active tab content:", normalizedError.message);
               sendResponse({
                 url: tab.url || "",
                 content: "",
                 title: "",
-                error:
-                  error instanceof Error
-                    ? error.message
-                    : "Failed to get content from the current tab.",
+                error: normalizedError.message,
               });
             }
           })();
@@ -938,9 +977,9 @@ export const registerMessageListener = (platform: PlatformService) => {
           return true;
 
         case "GET_ELEMENTS":
-          chrome.tabs.query({ currentWindow: true }, async (tabs) => {
-            const tab = tabs.find((t) => t.id === message.tabId);
+          void (async () => {
             try {
+              const tab = await getAccessibleTab(message.tabId, platform);
               const result = await getPageElements(tab);
 
               if (result.isErr()) {
@@ -956,7 +995,7 @@ export const registerMessageListener = (platform: PlatformService) => {
                 elements: result.value,
               });
             } catch (error) {
-              const normalizedError = normalizeError(error);
+              const normalizedError = normalizePageAccessError(error, platform);
               log("Error reading page elements:", normalizedError.message);
               sendResponse({
                 elements: "",
@@ -964,13 +1003,13 @@ export const registerMessageListener = (platform: PlatformService) => {
                   normalizedError.message ?? "Failed to read page elements.",
               });
             }
-          });
+          })();
           return true;
 
         case "CLICK_ELEMENT":
-          chrome.tabs.query({ currentWindow: true }, async (tabs) => {
-            const tab = tabs.find((t) => t.id === message.tabId);
+          void (async () => {
             try {
+              const tab = await getAccessibleTab(message.tabId, platform);
               const result = await clickPageElement(tab, message.elementId);
 
               if (result.isErr()) {
@@ -1001,7 +1040,7 @@ export const registerMessageListener = (platform: PlatformService) => {
                 elementsDiff: elementsDiff.value,
               });
             } catch (error) {
-              const normalizedError = normalizeError(error);
+              const normalizedError = normalizePageAccessError(error, platform);
               log("Error clicking page element:", normalizedError.message);
               sendResponse({
                 success: false,
@@ -1009,13 +1048,13 @@ export const registerMessageListener = (platform: PlatformService) => {
                   normalizedError.message ?? "Failed to click page element.",
               });
             }
-          });
+          })();
           return true;
 
         case "TYPE_TEXT":
-          chrome.tabs.query({ currentWindow: true }, async (tabs) => {
-            const tab = tabs.find((t) => t.id === message.tabId);
+          void (async () => {
             try {
+              const tab = await getAccessibleTab(message.tabId, platform);
               const result = await typeText(
                 tab,
                 message.elementId,
@@ -1051,7 +1090,7 @@ export const registerMessageListener = (platform: PlatformService) => {
                 elementsDiff: elementsDiff.value,
               });
             } catch (error) {
-              const normalizedError = normalizeError(error);
+              const normalizedError = normalizePageAccessError(error, platform);
               log("Error typing text in element:", normalizedError.message);
               sendResponse({
                 success: false,
@@ -1059,13 +1098,13 @@ export const registerMessageListener = (platform: PlatformService) => {
                   normalizedError.message ?? "Failed to type text in element.",
               });
             }
-          });
+          })();
           return true;
 
         case "DELETE_TEXT":
-          chrome.tabs.query({ currentWindow: true }, async (tabs) => {
-            const tab = tabs.find((t) => t.id === message.tabId);
+          void (async () => {
             try {
+              const tab = await getAccessibleTab(message.tabId, platform);
               const result = await typeText(
                 tab,
                 message.elementId,
@@ -1101,7 +1140,7 @@ export const registerMessageListener = (platform: PlatformService) => {
                 elementsDiff: elementsDiff.value,
               });
             } catch (error) {
-              const normalizedError = normalizeError(error);
+              const normalizedError = normalizePageAccessError(error, platform);
               log("Error deleting text in element:", normalizedError.message);
               sendResponse({
                 success: false,
@@ -1110,7 +1149,7 @@ export const registerMessageListener = (platform: PlatformService) => {
                   "Failed to delete text in element.",
               });
             }
-          });
+          })();
           return true;
 
         case "INPUT_BAR_STATUS":

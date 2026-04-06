@@ -24,13 +24,59 @@ const platform = new ChromePlatformService();
 
 registerForceUpdateListener(platform);
 
+async function ensureSidebarContentScript(tabId: number): Promise<boolean> {
+  try {
+    const response = await chrome.tabs.sendMessage(tabId, { action: "ping" });
+    if (response?.success) {
+      return true;
+    }
+  } catch {
+    // Content script is not present on this page yet.
+  }
+
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ["content-script.js"],
+    });
+    const response = await chrome.tabs.sendMessage(tabId, { action: "ping" });
+    return response?.success === true;
+  } catch (error) {
+    log("Failed to inject sidebar content script:", error);
+    return false;
+  }
+}
+
+async function openChromeExtensionUi(tab: chrome.tabs.Tab): Promise<void> {
+  if (isGoogleChrome()) {
+    await chrome.sidePanel.open({ windowId: tab.windowId });
+    return;
+  }
+
+  if (!tab.id) {
+    return;
+  }
+
+  const isReady = await ensureSidebarContentScript(tab.id);
+  if (!isReady) {
+    log("Sidebar content script is not available for tab:", tab.id);
+    return;
+  }
+
+  await chrome.tabs.sendMessage(tab.id, { action: "openSidebar" });
+}
+
 /**
  * Listener to open/close the side panel when the user clicks on the extension icon.
  */
 chrome.action.onClicked.addListener((tab) => {
   if (!isGoogleChrome() && tab.id) {
-    chrome.tabs.sendMessage(tab.id, { action: "toggleSidebar" }).catch(() => {
-      // Content script is not available on this page (e.g. Arc blocked pages).
+    void ensureSidebarContentScript(tab.id).then((isReady) => {
+      if (!isReady) {
+        return;
+      }
+
+      void chrome.tabs.sendMessage(tab.id!, { action: "toggleSidebar" });
     });
   }
 });
@@ -72,7 +118,7 @@ chrome.contextMenus.onClicked.addListener(async (event, tab) => {
   // context. Any await before this call would break the gesture chain and throw:
   // "sidePanel.open() may only be called in response to a user gesture".
   if (tab) {
-    void chrome.sidePanel.open({ windowId: tab.windowId });
+    void openChromeExtensionUi(tab);
   }
 
   const isExtensionReady =
