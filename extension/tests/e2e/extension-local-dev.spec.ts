@@ -5,8 +5,8 @@ import {
   expect,
   type Page,
 } from "@playwright/test";
-import { createServer, type Server } from "http";
 import { mkdtemp, rm } from "fs/promises";
+import { createServer, type Server } from "http";
 import { tmpdir } from "os";
 import { resolve } from "path";
 
@@ -17,6 +17,9 @@ type ExtensionFixtures = {
 };
 
 const extensionBuildPath = resolve(__dirname, "../../platforms/chrome/build");
+const defaultAgentName = "openrouter-test";
+const hiddenSecret = "DUST-SECRET-73Q-MANGO";
+const visibleDecoy = "DUST-DECOY-11Z-SPOON";
 
 let fixtureServer: Server | null = null;
 let fixtureServerUrl = "";
@@ -33,10 +36,14 @@ async function startFixtureServer(): Promise<string> {
       <article>
         <h1>Extension Fixture</h1>
         <p>Alpha beta gamma delta.</p>
+        <p>The visible decoy code is ${visibleDecoy}.</p>
         <ul>
           <li>First bullet</li>
           <li>Second bullet</li>
         </ul>
+        <div style="display: none">
+          Hidden page secret for the Dust extension test: ${hiddenSecret}
+        </div>
       </article>
     </main>
   </body>
@@ -78,6 +85,109 @@ async function sendRuntimeMessage<T>(
       });
     });
   }, message) as Promise<T>;
+}
+
+async function ensureAuthenticated(
+  extensionContext: BrowserContext,
+  extensionId: string,
+  extensionPage: Page
+) {
+  if (
+    (await extensionPage.getByRole("button", { name: "Sign in" }).count()) === 0
+  ) {
+    await expect(extensionPage).not.toHaveURL(/\/login$/);
+    return;
+  }
+
+  const authTabPromise = extensionContext.waitForEvent("page", (page) => {
+    return !page.url().startsWith(`chrome-extension://${extensionId}`);
+  });
+
+  await extensionPage.getByRole("button", { name: "Sign in" }).click();
+
+  const authTab = await authTabPromise;
+  await authTab.waitForLoadState("domcontentloaded");
+
+  await expect(authTab).toHaveURL(/localhost:7600\/user_management\/authorize/);
+  await expect(authTab.getByText("FAKE WORKOS - LOCAL DEV")).toBeVisible();
+
+  const closePromise = authTab.waitForEvent("close");
+  await authTab.getByRole("button", { name: "Continue" }).click();
+  await closePromise;
+
+  await expect(extensionPage).not.toHaveURL(/\/login$/);
+  await expect(extensionPage.getByText(/⇧|Ctrl\+E/)).toBeVisible();
+}
+
+async function submitMessageThroughUi(page: Page, message: string) {
+  const editor = page.locator(".tiptap.ProseMirror").first();
+  await expect(editor).toBeVisible();
+  await editor.click();
+  await page.keyboard.type(message);
+  await page.keyboard.press("Enter");
+}
+
+async function selectAgentThroughUi(page: Page, agentName: string) {
+  const agentCard = page
+    .locator('[role="button"]')
+    .filter({ hasText: agentName })
+    .first();
+
+  await expect(agentCard).toBeVisible();
+  await agentCard.click();
+
+  await expect(page.locator(".tiptap.ProseMirror").first()).toContainText(
+    `@${agentName}`
+  );
+}
+
+async function waitForSecretInUi(page: Page, secret: string): Promise<void> {
+  const deadline = Date.now() + 90_000;
+  const secretLocator = page.getByText(secret, { exact: false });
+  const virtuosoLicenseWarning = page.getByText(
+    /VirtuosoMessageListLicense is missing a license key/i
+  );
+
+  while (Date.now() < deadline) {
+    if ((await secretLocator.count()) > 0) {
+      await expect(secretLocator.first()).toBeVisible();
+      return;
+    }
+
+    if ((await virtuosoLicenseWarning.count()) > 0) {
+      if (await virtuosoLicenseWarning.first().isVisible()) {
+        throw new Error(
+          "Conversation UI did not render because the Virtuoso message list license key is missing."
+        );
+      }
+    }
+
+    const allowButton = page.getByRole("button", { name: "Allow" });
+    if ((await allowButton.count()) > 0) {
+      const firstAllow = allowButton.first();
+      if (await firstAllow.isVisible()) {
+        await firstAllow.click();
+        await page.waitForTimeout(500);
+        continue;
+      }
+    }
+
+    const retryButton = page.getByRole("button", { name: "Retry" });
+    if ((await retryButton.count()) > 0) {
+      const firstRetry = retryButton.first();
+      if (await firstRetry.isVisible()) {
+        throw new Error(
+          "Agent conversation reached a visible error state requiring retry."
+        );
+      }
+    }
+
+    await page.waitForTimeout(750);
+  }
+
+  throw new Error(
+    "Timed out waiting for the hidden secret to appear in the UI."
+  );
 }
 
 const test = base.extend<ExtensionFixtures>({
@@ -171,26 +281,7 @@ test.describe
       extensionId,
       extensionPage,
     }) => {
-      const authTabPromise = extensionContext.waitForEvent("page", (page) => {
-        return !page.url().startsWith(`chrome-extension://${extensionId}`);
-      });
-
-      await extensionPage.getByRole("button", { name: "Sign in" }).click();
-
-      const authTab = await authTabPromise;
-      await authTab.waitForLoadState("domcontentloaded");
-
-      await expect(authTab).toHaveURL(
-        /localhost:7600\/user_management\/authorize/
-      );
-      await expect(authTab.getByText("FAKE WORKOS - LOCAL DEV")).toBeVisible();
-
-      const closePromise = authTab.waitForEvent("close");
-      await authTab.getByRole("button", { name: "Continue" }).click();
-      await closePromise;
-
-      await expect(extensionPage).not.toHaveURL(/\/login$/);
-      await expect(extensionPage.getByText(/⇧|Ctrl\+E/)).toBeVisible();
+      await ensureAuthenticated(extensionContext, extensionId, extensionPage);
       await expect(
         extensionPage.getByRole("button", { name: "Sign in" })
       ).toHaveCount(0);
@@ -198,9 +289,10 @@ test.describe
 
     test("reads the active localhost page content", async ({
       extensionContext,
+      extensionId,
       extensionPage,
     }) => {
-      await expect(extensionPage).not.toHaveURL(/\/login$/);
+      await ensureAuthenticated(extensionContext, extensionId, extensionPage);
 
       const targetPage = await extensionContext.newPage();
       try {
@@ -225,8 +317,39 @@ test.describe
         const normalizedContent = capture.content?.replace(/\s+/g, " ").trim();
         expect(normalizedContent).toContain("# Extension Fixture");
         expect(normalizedContent).toContain("Alpha beta gamma delta.");
+        expect(normalizedContent).toContain(visibleDecoy);
+        expect(normalizedContent).toContain(hiddenSecret);
         expect(normalizedContent).toContain("- First bullet");
         expect(normalizedContent).toContain("- Second bullet");
+      } finally {
+        await targetPage.close();
+      }
+    });
+
+    test("asks an agent for the hidden page secret and verifies the reply", async ({
+      extensionContext,
+      extensionId,
+      extensionPage,
+    }) => {
+      await ensureAuthenticated(extensionContext, extensionId, extensionPage);
+
+      const targetPage = await extensionContext.newPage();
+      try {
+        await targetPage.goto(fixtureServerUrl);
+        await expect(targetPage).toHaveTitle("Local Extension Fixture");
+        await extensionPage.goto(`chrome-extension://${extensionId}/main.html`);
+
+        await selectAgentThroughUi(extensionPage, defaultAgentName);
+
+        await submitMessageThroughUi(
+          extensionPage,
+          "Read the browser tab titled Local Extension Fixture and tell me the hidden secret string from that page."
+        );
+
+        await expect(extensionPage).toHaveURL(
+          /\/w\/[^/]+\/conversation\/[^/]+/
+        );
+        await waitForSecretInUi(extensionPage, hiddenSecret);
       } finally {
         await targetPage.close();
       }
