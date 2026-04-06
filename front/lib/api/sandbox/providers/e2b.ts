@@ -15,6 +15,7 @@ import {
   traceSandboxOperation,
 } from "@app/lib/api/sandbox/provider";
 import logger from "@app/logger/logger";
+import { isDevelopment } from "@app/types/shared/env";
 import type { Result } from "@app/types/shared/result";
 import { Err, Ok } from "@app/types/shared/result";
 import { assertNever } from "@app/types/shared/utils/assert_never";
@@ -25,8 +26,30 @@ const SANDBOX_LIFETIME_MS = 86_400_000; // 24 hours (E2B Pro max; reaper manages
 
 /** Timeout for individual API calls to E2B (create, connect, etc.). */
 const REQUEST_TIMEOUT_MS = 30_000;
+const DEV_FALLBACK_TEMPLATE_ID = "base";
+const DEV_FALLBACK_SANDBOX_LIFETIME_MS = 3_600_000; // 1 hour max for E2B base template
 
 const ALL_TRAFFIC = "0.0.0.0/0";
+
+function getRequestedSandboxLifetimeMs(): number {
+  return isDevelopment()
+    ? DEV_FALLBACK_SANDBOX_LIFETIME_MS
+    : SANDBOX_LIFETIME_MS;
+}
+
+function isMissingTemplateError(err: unknown): boolean {
+  if (err instanceof NotFoundError) {
+    return true;
+  }
+
+  if (err instanceof Error) {
+    return (
+      err.message.includes("template") && err.message.includes("not found")
+    );
+  }
+
+  return false;
+}
 
 interface E2BNetworkOpts {
   allowOut?: string[];
@@ -103,7 +126,7 @@ export class E2BSandboxProvider implements SandboxProvider {
           sandbox = await Sandbox.create(templateId, {
             ...this.connectionOpts(),
             envs: hasEnvVars ? envVars : undefined,
-            timeoutMs: SANDBOX_LIFETIME_MS,
+            timeoutMs: getRequestedSandboxLifetimeMs(),
             requestTimeoutMs: REQUEST_TIMEOUT_MS,
             network: {
               ...(config.network ? toE2BNetworkOpts(config.network) : {}),
@@ -111,7 +134,35 @@ export class E2BSandboxProvider implements SandboxProvider {
             },
           });
         } catch (err) {
-          return new Err(normalizeError(err));
+          if (!isDevelopment() || !isMissingTemplateError(err)) {
+            return new Err(normalizeError(err));
+          }
+
+          logger.warn(
+            {
+              err: normalizeError(err),
+              fallbackTemplateId: DEV_FALLBACK_TEMPLATE_ID,
+              missingTemplateId: templateId,
+            },
+            "Dust sandbox template missing in development; retrying with fallback template"
+          );
+
+          try {
+            const envVars = config.envVars ?? {};
+            const hasEnvVars = Object.keys(envVars).length > 0;
+            sandbox = await Sandbox.create(DEV_FALLBACK_TEMPLATE_ID, {
+              ...this.connectionOpts(),
+              envs: hasEnvVars ? envVars : undefined,
+              timeoutMs: getRequestedSandboxLifetimeMs(),
+              requestTimeoutMs: REQUEST_TIMEOUT_MS,
+              network: {
+                ...(config.network ? toE2BNetworkOpts(config.network) : {}),
+                allowPublicTraffic: false,
+              },
+            });
+          } catch (fallbackErr) {
+            return new Err(normalizeError(fallbackErr));
+          }
         }
 
         logger.info(
@@ -141,7 +192,7 @@ export class E2BSandboxProvider implements SandboxProvider {
         try {
           await Sandbox.connect(providerId, {
             ...this.connectionOpts(),
-            timeoutMs: SANDBOX_LIFETIME_MS,
+            timeoutMs: getRequestedSandboxLifetimeMs(),
           });
         } catch (err) {
           if (err instanceof NotFoundError) {
@@ -242,7 +293,7 @@ export class E2BSandboxProvider implements SandboxProvider {
         try {
           sandbox = await Sandbox.connect(providerId, {
             ...this.connectionOpts(),
-            timeoutMs: SANDBOX_LIFETIME_MS,
+            timeoutMs: getRequestedSandboxLifetimeMs(),
           });
         } catch (err) {
           if (err instanceof NotFoundError) {
@@ -297,7 +348,7 @@ export class E2BSandboxProvider implements SandboxProvider {
         try {
           sandbox = await Sandbox.connect(providerId, {
             ...this.connectionOpts(),
-            timeoutMs: SANDBOX_LIFETIME_MS,
+            timeoutMs: getRequestedSandboxLifetimeMs(),
           });
         } catch (err) {
           if (err instanceof NotFoundError) {
@@ -343,7 +394,7 @@ export class E2BSandboxProvider implements SandboxProvider {
         try {
           sandbox = await Sandbox.connect(providerId, {
             ...this.connectionOpts(),
-            timeoutMs: SANDBOX_LIFETIME_MS,
+            timeoutMs: getRequestedSandboxLifetimeMs(),
           });
         } catch (err) {
           if (err instanceof NotFoundError) {

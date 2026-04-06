@@ -107,6 +107,7 @@ case "${1:-help}" in
       NODE_ENV=development \
       IS_DEVELOPMENT=true \
       DUST_DISABLE_PAYWALL=true \
+      DUST_DISABLE_USAGE_LIMITS=true \
       PORT=3000 \
       FRONT_DATABASE_URI="postgres://dev:dev@${DB_HOST}:5432/dust_front" \
       FRONT_DATABASE_READ_REPLICA_URI="postgres://dev:dev@${DB_HOST}:5432/dust_front" \

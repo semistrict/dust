@@ -16,7 +16,7 @@ interface AppContentLayoutProps {
 
 export function AppContentLayout({ children }: AppContentLayoutProps) {
   const owner = useWorkspace();
-  const { subscription } = useAuth();
+  const { subscription, isPaywallDisabled } = useAuth();
   const {
     contentClassName,
     contentWidth,
@@ -64,6 +64,7 @@ export function AppContentLayout({ children }: AppContentLayoutProps) {
       >
         <SubscriptionEndBanner
           isAdmin={isAdmin(owner)}
+          isPaywallDisabled={isPaywallDisabled}
           owner={owner}
           subscription={subscription}
         />

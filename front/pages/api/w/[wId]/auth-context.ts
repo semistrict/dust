@@ -18,6 +18,7 @@ export type GetWorkspaceAuthContextResponseType = {
   user: UserType;
   workspace: LightWorkspaceType;
   subscription: SubscriptionType;
+  isPaywallDisabled: boolean;
   isAdmin: boolean;
   isBuilder: boolean;
   featureFlags: WhitelistableFeature[];
@@ -93,6 +94,7 @@ async function handler(
     user: user.toJSON(),
     workspace,
     subscription,
+    isPaywallDisabled: process.env.DUST_DISABLE_PAYWALL === "true",
     isAdmin: auth.isAdmin(),
     isBuilder: auth.isBuilder(),
     featureFlags,

@@ -60,6 +60,10 @@ export async function hasReachedProgrammaticUsageLimits(
 export async function checkProgrammaticUsageLimits(
   auth: Authenticator
 ): Promise<Result<void, Error>> {
+  if (process.env.DUST_DISABLE_USAGE_LIMITS === "true") {
+    return new Ok(undefined);
+  }
+
   const isAdmin = auth.isAdmin();
 
   // First check workspace credits.

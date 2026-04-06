@@ -10,6 +10,7 @@ export interface AuthContextValue {
   user: UserType;
   workspace: LightWorkspaceType;
   subscription: SubscriptionType;
+  isPaywallDisabled: boolean;
   isAdmin: boolean;
   isBuilder: boolean;
   featureFlags: WhitelistableFeature[];

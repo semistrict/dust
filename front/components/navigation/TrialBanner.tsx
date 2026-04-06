@@ -10,12 +10,14 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 interface SubscriptionEndBannerProps {
   isAdmin: boolean;
+  isPaywallDisabled: boolean;
   owner: { sId: string };
   subscription: SubscriptionType;
 }
 
 export function SubscriptionEndBanner({
   isAdmin,
+  isPaywallDisabled,
   owner,
   subscription,
 }: SubscriptionEndBannerProps) {
@@ -28,6 +30,10 @@ export function SubscriptionEndBanner({
   const nowRef = useRef(Date.now());
 
   const bannerState = useMemo(() => {
+    if (isPaywallDisabled) {
+      return null;
+    }
+
     if (!endDate) {
       return null;
     }
@@ -42,7 +48,7 @@ export function SubscriptionEndBanner({
     const daysRemaining = Math.max(0, Math.ceil((endDate - now) / DAY_MS));
 
     return { hasEnded, daysRemaining };
-  }, [endDate]);
+  }, [endDate, isPaywallDisabled]);
 
   if (!bannerState) {
     return null;

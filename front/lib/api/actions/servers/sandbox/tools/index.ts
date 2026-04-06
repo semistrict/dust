@@ -26,12 +26,18 @@ import { startTelemetry } from "@app/lib/api/sandbox/telemetry";
 import type { Authenticator } from "@app/lib/auth";
 import { SandboxResource } from "@app/lib/resources/sandbox_resource";
 import logger from "@app/logger/logger";
+import { isDevelopment } from "@app/types/shared/env";
 import { Err, Ok } from "@app/types/shared/result";
 
 const DEFAULT_WORKING_DIRECTORY = "/home/agent";
+const DEV_FALLBACK_WORKING_DIRECTORY = "/home/user";
 const DEFAULT_EXEC_TIMEOUT_MS = 60_000;
 const MAX_OUTPUT_LINES = 2_000;
 const MAX_OUTPUT_BYTES = 50_000;
+
+function buildDevFallbackCommand(command: string): string {
+  return `bash -lc ${JSON.stringify(command)}`;
+}
 
 // TODO(SANDBOX-S1): Offload large outputs to a temporary file on the sandbox
 // (like coding agents do). The model would only see tail-truncated output plus
@@ -149,12 +155,18 @@ export function createSandboxTools(
 
       const providerId = agentConfiguration.model.providerId;
       const timeoutSec = timeoutMs ? Math.ceil(timeoutMs / 1000) : 60;
-      const wrappedCommand = wrapCommand(command, providerId, {
-        timeoutSec,
-      });
+      const wrappedCommand = isDevelopment()
+        ? buildDevFallbackCommand(command)
+        : wrapCommand(command, providerId, {
+            timeoutSec,
+          });
 
       const execResult = await sandbox.exec(auth, wrappedCommand, {
-        workingDirectory: workingDirectory ?? DEFAULT_WORKING_DIRECTORY,
+        workingDirectory:
+          workingDirectory ??
+          (isDevelopment()
+            ? DEV_FALLBACK_WORKING_DIRECTORY
+            : DEFAULT_WORKING_DIRECTORY),
         envVars: {
           DUST_SANDBOX_TOKEN: sandboxToken,
           DUST_API_URL: `${config.getClientFacingUrl()}/api/v1/w/${auth.getNonNullableWorkspace().sId}`,
