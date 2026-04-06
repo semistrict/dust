@@ -68,6 +68,12 @@ fn main() {
         let store: Box<dyn store::Store + Sync + Send> = match std::env::var("CORE_DATABASE_URI") {
             Ok(db_uri) => {
                 let store = postgres::PostgresStore::new(&db_uri).await?;
+                if std::env::var("IS_LOCAL_DEV")
+                    .map(|value| value != "0" && value.to_lowercase() != "false")
+                    .unwrap_or(false)
+                {
+                    store.init().await?;
+                }
                 Box::new(store)
             }
             Err(_) => Err(anyhow!("CORE_DATABASE_URI is required (postgres)"))?,

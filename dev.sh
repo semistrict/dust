@@ -80,6 +80,8 @@ case "${1:-help}" in
       CORE_DATABASE_URI="postgres://dev:dev@${DB_HOST}:5432/dust_api" \
       CORE_DATABASE_READ_REPLICA_URI="postgres://dev:dev@${DB_HOST}:5432/dust_api" \
       OAUTH_DATABASE_URI="postgres://dev:dev@${DB_HOST}:5432/dust_oauth" \
+      REDIS_URI="redis://${REDIS_HOST}:6379" \
+      REDIS_CACHE_URI="redis://${REDIS_HOST}:6379" \
       ELASTICSEARCH_URL="http://${ES_HOST}:9200" \
       ELASTICSEARCH_USERNAME=elastic \
       ELASTICSEARCH_PASSWORD="${ELASTICSEARCH_PASSWORD:-dust-dev-password}" \

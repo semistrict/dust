@@ -73,6 +73,12 @@ impl QdrantClients {
         match std::env::var(url_var.clone()) {
             Ok(url) => {
                 let mut config = QdrantConfig::from_url(&url);
+                if std::env::var("IS_LOCAL_DEV")
+                    .map(|value| value != "0" && value.to_lowercase() != "false")
+                    .unwrap_or(false)
+                {
+                    config = config.skip_compatibility_check();
+                }
                 match std::env::var(api_key_var.clone()) {
                     Ok(api_key) => {
                         config.set_api_key(&api_key);

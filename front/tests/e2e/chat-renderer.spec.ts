@@ -1,4 +1,4 @@
-import { expect, request, test, type Page, type Route } from "@playwright/test";
+import { expect, type Page, type Route, request, test } from "@playwright/test";
 import { config } from "dotenv";
 import { resolve } from "path";
 import { Client } from "pg";
@@ -53,10 +53,7 @@ type CreatedConversation = {
   initialBody: any;
 };
 
-async function sessionGet(
-  page: Page,
-  path: string
-) {
+async function sessionGet(page: Page, path: string) {
   const requestContext = await request.newContext({
     storageState: await page.context().storageState(),
   });
@@ -69,11 +66,7 @@ async function sessionGet(
   }
 }
 
-async function sessionPost(
-  page: Page,
-  path: string,
-  payload: unknown
-) {
+async function sessionPost(page: Page, path: string, payload: unknown) {
   const requestContext = await request.newContext({
     storageState: await page.context().storageState(),
   });
@@ -200,10 +193,7 @@ function findAgentMessages(conversationBody: any) {
     });
 }
 
-async function waitForAgentMessage(
-  page: Page,
-  conversationId: string
-) {
+async function waitForAgentMessage(page: Page, conversationId: string) {
   const deadline = Date.now() + 90_000;
 
   while (Date.now() < deadline) {
@@ -501,10 +491,7 @@ async function routeRetriedAgentMessageSuccessOnce(
   });
 }
 
-async function createLongConversation(
-  _page: Page,
-  messageCount = 60
-) {
+async function createLongConversation(_page: Page, messageCount = 60) {
   const seed = uniqueId("long");
   const messages = Array.from({ length: messageCount }, (_, index) => {
     return `${seed}-message-${String(index + 1).padStart(2, "0")}`;
@@ -522,9 +509,7 @@ async function createLongConversation(
   };
 }
 
-async function createPaginatedConversation(
-  _page: Page
-) {
+async function createPaginatedConversation(_page: Page) {
   const seed = uniqueId("paginated");
   const messages = Array.from({ length: 52 }, (_, index) => {
     return `${seed}-message-${String(index + 1).padStart(2, "0")}`;
@@ -1403,7 +1388,7 @@ async function seedConversationWithBranchApproval(params: {
     );
     const agentMessageId = Number(agentMessageInsert.rows[0].id);
 
-    const branchMessageRowInsert = await client.query<{ id: string }>(
+    await client.query<{ id: string }>(
       `INSERT INTO messages
         ("createdAt", "updatedAt", "sId", version, visibility, rank, "workspaceId",
          "conversationId", "branchId", "agentMessageId", "parentId")
@@ -1659,18 +1644,14 @@ async function seedConversationWithBranchApproval(params: {
   }
 }
 
-async function waitForLicenseWarningToStayGone(
-  page: Page
-) {
+async function waitForLicenseWarningToStayGone(page: Page) {
   const warning = page.getByText(
     /VirtuosoMessageListLicense is missing a license key|Purchase one from/i
   );
   await expect(warning).toHaveCount(0);
 }
 
-async function getScrollTop(
-  page: Page
-): Promise<number> {
+async function getScrollTop(page: Page): Promise<number> {
   return page
     .getByTestId("conversation-scroll-container")
     .evaluate((element: HTMLElement) => element.scrollTop);
@@ -1690,9 +1671,7 @@ async function getScrollMetrics(
     });
 }
 
-async function scrollConversationToTop(
-  page: Page
-) {
+async function scrollConversationToTop(page: Page) {
   await page
     .getByTestId("conversation-scroll-container")
     .evaluate((element: HTMLElement) => {
@@ -1701,10 +1680,7 @@ async function scrollConversationToTop(
     });
 }
 
-async function submitPlainMessage(
-  page: Page,
-  message: string
-) {
+async function submitPlainMessage(page: Page, message: string) {
   const editor = page.locator(".tiptap.ProseMirror").first();
   await expect(editor).toBeVisible();
   await editor.click();
@@ -1712,10 +1688,7 @@ async function submitPlainMessage(
   await page.keyboard.press("Enter");
 }
 
-async function openUserMessageActions(
-  page: Page,
-  messageText: string
-) {
+async function openUserMessageActions(page: Page, messageText: string) {
   const message = page.getByText(messageText, { exact: false }).first();
   await expect(message).toBeVisible();
   await message.hover();
@@ -1752,10 +1725,16 @@ test.describe
       await openConversation(page, conversationId);
       await waitForLicenseWarningToStayGone(page);
       await expect(
-        page.getByText(firstMessage, { exact: false })
+        page
+          .locator(`[data-message-sid]`)
+          .filter({ hasText: firstMessage })
+          .first()
       ).toBeVisible();
       await expect(
-        page.getByText(secondMessage, { exact: false })
+        page
+          .locator(`[data-message-sid]`)
+          .filter({ hasText: secondMessage })
+          .first()
       ).toBeVisible();
     });
 
@@ -2236,6 +2215,100 @@ test.describe
       ).toBeVisible();
     });
 
+    test("dedupes repeated approval prompts for equivalent parallel tool calls", async ({
+      page,
+    }) => {
+      const adminUserSId = await getAdminUserSId();
+      const { conversationId, agentMessageSId } =
+        await seedConversationWithAgentFixture({
+          agentConfigurationId: "dust",
+          agentContent: "Pending approval fixture",
+          agentStatus: "succeeded",
+          title: uniqueId("blocked-validation-dedupe-title"),
+          userMessage: uniqueId("blocked-validation-dedupe-user"),
+        });
+
+      await page.route(
+        `**/assistant/conversations/${conversationId}/actions/blocked`,
+        async (route: Route) => {
+          const body = JSON.stringify({
+            blockedActions: [
+              {
+                messageId: agentMessageSId,
+                userId: adminUserSId,
+                conversationId,
+                actionId: uniqueSid("act"),
+                configurationId: "fixture-tool",
+                created: Date.now(),
+                inputs: {
+                  humanReadableDescription: "click the secret button",
+                },
+                stake: "low",
+                metadata: {
+                  toolName: "interact_with_page",
+                  mcpServerName: "dust-chrome-extension",
+                  agentName: "openrouter-test",
+                  icon: null,
+                },
+                status: "blocked_validation_required",
+                authorizationInfo: null,
+              },
+              {
+                messageId: agentMessageSId,
+                userId: adminUserSId,
+                conversationId,
+                actionId: uniqueSid("act"),
+                configurationId: "fixture-tool",
+                created: Date.now() + 1,
+                inputs: {
+                  humanReadableDescription: "click the secret button",
+                },
+                stake: "low",
+                metadata: {
+                  toolName: "interact_with_page",
+                  mcpServerName: "dust-chrome-extension",
+                  agentName: "openrouter-test",
+                  icon: null,
+                },
+                status: "blocked_validation_required",
+                authorizationInfo: null,
+              },
+            ],
+          });
+
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body,
+          });
+        }
+      );
+
+      await page.route(
+        `**/assistant/conversations/${conversationId}/messages/${agentMessageSId}/validate-action`,
+        async (route: Route) => {
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({ success: true }),
+          });
+        }
+      );
+
+      await openConversation(page, conversationId);
+      await expect(page.getByText(/1 manual action required/i)).toBeVisible();
+      await expect(
+        page.getByText(/Allow .*click the secret button\?/i)
+      ).toHaveCount(1);
+
+      await page.getByRole("button", { name: "Allow", exact: true }).click();
+
+      await expect(page.getByText(/manual action required/i)).toHaveCount(0);
+      await expect(
+        page.getByText(/Allow .*click the secret button\?/i)
+      ).toHaveCount(0);
+    });
+
     test("the Review button scrolls to the blocked validation message", async ({
       page,
     }) => {
@@ -2245,7 +2318,7 @@ test.describe
           agentConfigurationId: "dust",
           agentContent: "Pending approval fixture",
           agentStatus: "succeeded",
-          fillerAfterCount: 30,
+          fillerAfterCount: 80,
           title: uniqueId("blocked-validation-scroll-title"),
           userMessage: uniqueId("blocked-validation-scroll-user"),
         });
@@ -2284,6 +2357,12 @@ test.describe
       );
 
       await openConversation(page, conversationId);
+      await expect
+        .poll(async () => {
+          const { clientHeight, scrollHeight } = await getScrollMetrics(page);
+          return scrollHeight - clientHeight;
+        })
+        .toBeGreaterThan(100);
       await page
         .getByTestId("conversation-scroll-container")
         .evaluate((element: HTMLElement) => {

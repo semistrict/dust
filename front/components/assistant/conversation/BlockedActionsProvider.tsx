@@ -1,5 +1,6 @@
 import { useConversations } from "@app/hooks/conversations";
 import type { BlockedToolExecution } from "@app/lib/actions/mcp";
+import { extractArgRequiringApprovalValues } from "@app/lib/actions/tool_status";
 import { useBlockedActions } from "@app/lib/swr/blocked_actions";
 import type { ConversationWithoutContentType } from "@app/types/assistant/conversation";
 import type { LightWorkspaceType } from "@app/types/user";
@@ -18,6 +19,63 @@ type BlockedActionQueueItem = {
   messageId: string;
   blockedAction: BlockedToolExecution;
 };
+
+function getBlockedActionPermissionKey(
+  blockedAction: BlockedToolExecution
+): string {
+  if (blockedAction.status !== "blocked_validation_required") {
+    return `action:${blockedAction.actionId}`;
+  }
+
+  switch (blockedAction.stake) {
+    case "low":
+      return [
+        "validation",
+        "low",
+        blockedAction.userId ?? "public",
+        blockedAction.configurationId,
+      ].join(":");
+
+    case "medium": {
+      const args = extractArgRequiringApprovalValues(
+        blockedAction.argumentsRequiringApproval ?? [],
+        blockedAction.inputs
+      );
+      const normalizedArgs = Object.fromEntries(
+        Object.entries(args).sort(([left], [right]) =>
+          left.localeCompare(right)
+        )
+      );
+
+      return [
+        "validation",
+        "medium",
+        blockedAction.userId ?? "public",
+        blockedAction.configurationId,
+        blockedAction.metadata.agentName,
+        JSON.stringify(normalizedArgs),
+      ].join(":");
+    }
+
+    default:
+      return `action:${blockedAction.actionId}`;
+  }
+}
+
+function dedupeBlockedActionsQueue(
+  queue: BlockedActionQueueItem[]
+): BlockedActionQueueItem[] {
+  const dedupedQueue = new Map<string, BlockedActionQueueItem>();
+
+  for (const item of queue) {
+    const key = getBlockedActionPermissionKey(item.blockedAction);
+    if (!dedupedQueue.has(key)) {
+      dedupedQueue.set(key, item);
+    }
+  }
+
+  return Array.from(dedupedQueue.values());
+}
 
 const EMPTY_BLOCKED_ACTIONS_QUEUE: BlockedActionQueueItem[] = [];
 const pulseDurationMs = 3000;
@@ -91,16 +149,18 @@ export function BlockedActionsProvider({
   useEffect(() => {
     if (conversationId) {
       setBlockedActionsQueue(
-        blockedActions.flatMap((action): BlockedActionQueueItem[] => {
-          if (action.status === "blocked_child_action_input_required") {
-            return action.childBlockedActionsList.map((childAction) => ({
-              blockedAction: childAction,
-              messageId: action.messageId,
-            }));
-          } else {
-            return [{ blockedAction: action, messageId: action.messageId }];
-          }
-        })
+        dedupeBlockedActionsQueue(
+          blockedActions.flatMap((action): BlockedActionQueueItem[] => {
+            if (action.status === "blocked_child_action_input_required") {
+              return action.childBlockedActionsList.map((childAction) => ({
+                blockedAction: childAction,
+                messageId: action.messageId,
+              }));
+            } else {
+              return [{ blockedAction: action, messageId: action.messageId }];
+            }
+          })
+        )
       );
     } else {
       setBlockedActionsQueue(EMPTY_BLOCKED_ACTIONS_QUEUE);
@@ -116,16 +176,16 @@ export function BlockedActionsProvider({
       blockedAction: BlockedToolExecution;
     }) => {
       setBlockedActionsQueue((prevQueue) => {
+        const nextItem = { blockedAction, messageId };
+        const nextKey = getBlockedActionPermissionKey(blockedAction);
         const existingIndex = prevQueue.findIndex(
-          (v) => v.blockedAction.actionId === blockedAction.actionId
+          (v) => getBlockedActionPermissionKey(v.blockedAction) === nextKey
         );
 
-        // If the action is not in the queue, add it.
-        // If the action is in the queue, replace it with the new one.
         return existingIndex === -1
-          ? [...prevQueue, { blockedAction, messageId }]
+          ? dedupeBlockedActionsQueue([...prevQueue, nextItem])
           : prevQueue.map((item, index) =>
-              index === existingIndex ? { blockedAction, messageId } : item
+              index === existingIndex ? nextItem : item
             );
       });
     },
@@ -174,11 +234,34 @@ export function BlockedActionsProvider({
 
   const removeCompletedAction = useCallback(
     (actionId: string) => {
-      stopPulsingAction(actionId);
+      setBlockedActionsQueue((prevQueue) => {
+        const completedAction = prevQueue.find(
+          (item) => item.blockedAction.actionId === actionId
+        )?.blockedAction;
 
-      setBlockedActionsQueue((prevQueue) =>
-        prevQueue.filter((item) => item.blockedAction.actionId !== actionId)
-      );
+        if (!completedAction) {
+          stopPulsingAction(actionId);
+          return prevQueue;
+        }
+
+        const completedActionKey =
+          getBlockedActionPermissionKey(completedAction);
+        const actionIdsToStop = prevQueue
+          .filter(
+            (item) =>
+              getBlockedActionPermissionKey(item.blockedAction) ===
+              completedActionKey
+          )
+          .map((item) => item.blockedAction.actionId);
+
+        actionIdsToStop.forEach((id) => stopPulsingAction(id));
+
+        return prevQueue.filter(
+          (item) =>
+            getBlockedActionPermissionKey(item.blockedAction) !==
+            completedActionKey
+        );
+      });
     },
     [stopPulsingAction]
   );
