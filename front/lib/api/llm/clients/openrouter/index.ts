@@ -11,20 +11,20 @@ import type {
   LLMStreamParameters,
 } from "@app/lib/api/llm/types/options";
 import { systemPromptToText } from "@app/lib/api/llm/types/options";
-import {
-  toMessages,
-  toOutputFormatParam,
-  toToolChoiceParam,
-  toTools,
-} from "@app/lib/api/llm/utils/openai_like/chat/conversation_to_openai";
-import { streamLLMEvents } from "@app/lib/api/llm/utils/openai_like/chat/openai_to_events";
 import { handleError } from "@app/lib/api/llm/utils/openai_like/errors";
+import {
+  toInput,
+  toResponseFormat,
+  toTool,
+  toToolOption,
+} from "@app/lib/api/llm/utils/openai_like/responses/conversation_to_openai";
+import { streamLLMEvents } from "@app/lib/api/llm/utils/openai_like/responses/openai_to_events";
 import type { Authenticator } from "@app/lib/auth";
 import assert from "assert";
 import { APIError, OpenAI } from "openai";
-import type { ChatCompletionCreateParamsStreaming } from "openai/resources/chat/completions";
+import type { ResponseCreateParamsStreaming } from "openai/resources/responses/responses";
 
-export class OpenRouterLLM extends LLM<ChatCompletionCreateParamsStreaming> {
+export class OpenRouterLLM extends LLM<ResponseCreateParamsStreaming> {
   private client: OpenAI;
 
   constructor(
@@ -49,26 +49,25 @@ export class OpenRouterLLM extends LLM<ChatCompletionCreateParamsStreaming> {
     prompt,
     specifications,
     forceToolCall,
-  }: LLMStreamParameters): ChatCompletionCreateParamsStreaming {
-    const tools =
-      specifications.length > 0 ? toTools(specifications) : undefined;
-
+  }: LLMStreamParameters): ResponseCreateParamsStreaming {
     return {
       model: this.modelId,
-      messages: toMessages(systemPromptToText(prompt), conversation),
+      input: toInput(systemPromptToText(prompt), conversation),
       stream: true,
       temperature: this.temperature ?? undefined,
-      tool_choice: toToolChoiceParam(specifications, forceToolCall),
-      ...(tools ? { tools } : {}),
-      response_format: toOutputFormatParam(this.responseFormat),
+      tools: specifications.map(toTool),
+      text: {
+        format: toResponseFormat(this.responseFormat, OPENROUTER_PROVIDER_ID),
+      },
+      tool_choice: toToolOption(specifications, forceToolCall),
     };
   }
 
   protected async *sendRequest(
-    payload: ChatCompletionCreateParamsStreaming
+    payload: ResponseCreateParamsStreaming
   ): AsyncGenerator<LLMEvent> {
     try {
-      const events = await this.client.chat.completions.create(payload);
+      const events = await this.client.responses.create(payload);
       yield* streamLLMEvents(events, this.metadata);
     } catch (err) {
       if (err instanceof APIError) {

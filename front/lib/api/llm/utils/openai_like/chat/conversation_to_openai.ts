@@ -144,27 +144,15 @@ export function toTools(
   specifications: AgentActionSpecification[]
 ): ChatCompletionTool[] {
   return specifications.map((tool) => {
-    const properties = tool.inputSchema.properties ?? {};
-    const parameters: {
-      type: "object";
-      properties: Record<string, unknown>;
-      required: string[];
-      additionalProperties: boolean;
-    } = {
-      type: "object",
-      properties,
-      // OpenAI requires all properties to be marked as required
-      required: Object.keys(properties),
-      additionalProperties: false,
-    };
-
     return {
       type: "function",
       function: {
-        strict: true,
+        // strict: false matches the Responses API behavior and avoids
+        // rejecting tools that have optional properties.
+        strict: false,
         name: tool.name,
         description: tool.description,
-        parameters,
+        parameters: { type: "object", ...tool.inputSchema },
       },
     };
   });

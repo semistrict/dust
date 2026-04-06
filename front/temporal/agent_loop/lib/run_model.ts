@@ -556,6 +556,7 @@ export async function runModel(
       messageCount:
         modelConversationRes.value.modelConversation.messages.length,
       toolCount: specifications.length,
+      toolNames: specifications.map((s) => s.name).join(", "),
     },
     "[LLM stream] Starting (agent loop)"
   );

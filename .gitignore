@@ -5,6 +5,7 @@
 .air
 test.ts
 .env.local
+.env
 .env.agent.local
 qdrant_storage
 .*.swp
@@ -22,7 +23,9 @@ oauth-api-keys.json
 yalc.lock
 front/public/sitemap.xml
 front/public/robots.txt
+front/test-results/
 mprocs.log
+.mprocs-logs/
 **/tsconfig.tsbuildinfo
 **/.npm-cache
 AGENTS.local.md
@@ -39,4 +42,3 @@ node_modules
 
 # Storybook static build output
 **/storybook-static/
-
